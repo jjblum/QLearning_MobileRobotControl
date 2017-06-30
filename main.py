@@ -1,18 +1,24 @@
 import numpy as np
 import scipy.integrate as spi
-import matplotlib.pyplot as plt
-import pylab
+#import matplotlib.pyplot as plt
+#import pylab
 import Boat
 import Strategies
 import Designs
 
 
-WITH_PLOTTING = True
+#WITH_PLOTTING = True
 TOTAL_TIME = 120.0  # [s]
 AREA_EDGE_SIZE = 30.0
 PLOT_SIZE = AREA_EDGE_SIZE + 10.0  # edge size of plot area
 dt = 0.25
 
+
+
+
+
+
+"""
 if WITH_PLOTTING:
     figx = 10.0
     figy = 10.0
@@ -22,6 +28,7 @@ if WITH_PLOTTING:
     ax_main.grid(b=False)  # no grid b/c it won't update correctly
     ax_main.set_xticks([])  # turn off axis labels b/c they wont update correctly
     ax_main.set_yticks([])  # turn off axis labels b/c they wont update correctly
+    axes = [-PLOT_SIZE, PLOT_SIZE, -PLOT_SIZE, PLOT_SIZE]
     boat_arrows = None
     plt.ioff()
     fig.show()
@@ -38,7 +45,6 @@ def plotSystem(pid_boat, q_boat, plot_time, waypoints):
     q_boat_x = q_boat.state[0]
     q_boat_y = q_boat.state[1]
     q_boat_th = q_boat.state[4]
-    axes = [-PLOT_SIZE, PLOT_SIZE, -PLOT_SIZE, PLOT_SIZE]
     ax_main.plot([-PLOT_SIZE, PLOT_SIZE], [-PLOT_SIZE, PLOT_SIZE],
                  'x', markersize=1, markerfacecolor='white', markeredgecolor='white')
     ax_main.axis(axes)  # requires those invisible 4 corner white markers
@@ -57,25 +63,14 @@ def plotSystem(pid_boat, q_boat, plot_time, waypoints):
                              transform=ax_main.transAxes, size=20)
     ax_main.draw_artist(time_text)
 
-    for i in range(len(waypoints)):
-        wp_text = ax_main.text(left + (waypoints[i][0]+PLOT_SIZE)/(2.0*PLOT_SIZE) + 0.04,
-                               bottom + (waypoints[i][1]+PLOT_SIZE)/(2.0*PLOT_SIZE) - 0.05,
-                               "{}".format(i),
-                                horizontalalignment='right', verticalalignment='bottom',
-                                transform=ax_main.transAxes, size=30)
-        ax_main.draw_artist(wp_text)
-
     pid_boat_arrow = pylab.arrow(pid_boat_x, pid_boat_y, 0.05*np.cos(pid_boat_th), 0.05*np.sin(pid_boat_th),
                              fc="g", ec="k", head_width=1.5, head_length=3.0)
     q_boat_arrow = pylab.arrow(q_boat_x, q_boat_y, 0.05*np.cos(q_boat_th), 0.05*np.sin(q_boat_th),
                              fc="r", ec="k", head_width=1.5, head_length=3.0)
     ax_main.draw_artist(pid_boat_arrow)
     ax_main.draw_artist(q_boat_arrow)
-    if pid_boat.plotData is not None:
-        ax_main.draw_artist(ax_main.plot(pid_boat.plotData[:, 0], pid_boat.plotData[:, 1], 'g-', linewidth=1.5)[0])
-    if q_boat.plotData is not None:
-        ax_main.draw_artist(ax_main.plot(q_boat.plotData[:, 0], q_boat.plotData[:, 1], 'r-', linewidth=1.5)[0])
     fig.canvas.blit(ax_main.bbox)
+"""
 
 
 def main():
@@ -142,8 +137,10 @@ def main():
             print "Your time exceeded the maximum time of {} seconds. Ending simulation".format(TOTAL_TIME)
             return
 
-        if WITH_PLOTTING:
-            plotSystem(pid_boat, q_boat, t, [waypoint])
+        #if WITH_PLOTTING:
+        #    plotSystem(pid_boat, q_boat, t, [waypoint])
 
 if __name__ == "__main__":
+    c = Canvas()
+    app.run()
     main()
