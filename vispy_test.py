@@ -1,96 +1,49 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright (c) 2015, Vispy Development Team.
+# -----------------------------------------------------------------------------
+# Copyright (c) 2015, Vispy Development Team. All Rights Reserved.
 # Distributed under the (new) BSD License. See LICENSE.txt for more info.
+# -----------------------------------------------------------------------------
 
 """
-This example shows how to use the `ArrowVisual` for a quiver plot
+Demonstrate the use of text in the root scene and a viewbox. Note
+how the point size is independent of scaling of viewbox and canvas.
 """
-
-from __future__ import division
-
 import sys
-import itertools
-
 import numpy as np
-from vispy import app, gloo, visuals
-from vispy.visuals.transforms import NullTransform
+
+from vispy import scene
+from vispy.scene.visuals import Text
+
+# Create canvas with a viewbox at the lower half
+canvas = scene.SceneCanvas(keys='interactive')
+vb = scene.widgets.ViewBox(parent=canvas.scene, border_color='b')
+vb.camera = scene.TurntableCamera(elevation=30, azimuth=30, up='+z')
+axis = scene.visuals.XYZAxis(parent=vb.scene)
+vb.camera.rect = 0, 0, 1, 1
 
 
-class Canvas(app.Canvas):
-    def __init__(self):
-        app.Canvas.__init__(self, title="Quiver plot", keys="interactive",
-                            size=(830, 430))
+@canvas.events.resize.connect
+def resize(event=None):
+    vb.pos = 1, canvas.size[1] // 2 - 1
+    vb.size = canvas.size[0] - 2, canvas.size[1] // 2 - 2
 
-        self.arrow_length = 20
+t1 = Text('Text in root scene (24 pt)', parent=canvas.scene, color='red')
+t1.font_size = 24
+t1.pos = canvas.size[0] // 2, canvas.size[1] // 3
 
-        self.grid_coords = None
-        self.line_vertices = None
-        self.last_mouse = (0, 0)
+t2 = Text('Text in viewbox (18 pt)', parent=vb.scene, color='green',
+          rotation=30)
+t2.font_size = 18
+t2.pos = 0.5, 0.3
 
-        self.generate_grid()
-
-        self.visual = visuals.ArrowVisual(
-            color='white',
-            connect='segments',
-            arrow_size=8
-        )
-
-        self.visual.events.update.connect(lambda evt: self.update())
-        self.visual.transform = NullTransform()
-
-        self.show()
-
-    def generate_grid(self):
-        num_cols = int(self.physical_size[0] / 50)
-        num_rows = int(self.physical_size[1] / 50)
-        coords = []
-
-        # Generate grid
-        for i, j in itertools.product(range(num_rows), range(num_cols)):
-            x = 25 + (50 * j)
-            y = 25 + (50 * i)
-
-            coords.append((x, y))
-
-        self.grid_coords = np.array(coords)
-
-    def on_resize(self, event):
-        self.generate_grid()
-        self.rotate_arrows(np.array(self.last_mouse))
-
-        vp = (0, 0, self.physical_size[0], self.physical_size[1])
-        self.context.set_viewport(*vp)
-        self.visual.transforms.configure(canvas=self, viewport=vp)
-
-    def rotate_arrows(self, point_towards):
-        direction_vectors = (self.grid_coords - point_towards).astype(
-            np.float32)
-        norms = np.sqrt(np.sum(direction_vectors**2, axis=-1))
-        direction_vectors[:, 0] /= norms
-        direction_vectors[:, 1] /= norms
-
-        vertices = np.repeat(self.grid_coords, 2, axis=0)
-        vertices[::2] = vertices[::2] + ((0.5 * self.arrow_length) *
-                                         direction_vectors)
-        vertices[1::2] = vertices[1::2] - ((0.5 * self.arrow_length) *
-                                           direction_vectors)
-
-        self.visual.set_data(
-            pos=vertices,
-            arrows=vertices.reshape((len(vertices)//2, 4)),
-        )
-
-    def on_mouse_move(self, event):
-        self.last_mouse = event.pos
-        self.rotate_arrows(np.array(event.pos))
-
-    def on_draw(self, event):
-        gloo.clear('black')
-        self.visual.draw()
+# Add a line so you can see translate/scale of camera
+N = 1000
+linedata = np.empty((N, 2), np.float32)
+linedata[:, 0] = np.linspace(0, 1, N)
+linedata[:, 1] = np.random.uniform(0.5, 0.1, (N,))
+scene.visuals.Line(pos=linedata, color='#f006', method='gl', parent=vb.scene)
 
 if __name__ == '__main__':
-    win = Canvas()
-
+    canvas.show()
     if sys.flags.interactive != 1:
-        app.run()
+        canvas.app.run()
