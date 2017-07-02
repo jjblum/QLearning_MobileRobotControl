@@ -73,10 +73,6 @@ class BoatVisual(visuals.Visual):
     def __init__(self, x, y, th, w, l, rgba):
         # Initialize the visual with a vertex shader and fragment shader
         visuals.Visual.__init__(self, vertex_shader, fragment_shader)
-        self.timer = app.Timer(interval='auto', connect=self.update_time, start=False)
-        self._time = 0.0
-        self._first_time = ptime.time()
-        self._last_time = ptime.time()
         self._x = x
         self._y = y
         self._th = th
@@ -90,22 +86,11 @@ class BoatVisual(visuals.Visual):
 
         # Assign values to the $position and $color template variables in the shaders.
         self._draw_mode = 'triangles'
-
         self.freeze()  # no more attributes
         self.shared_program.vert['position'] = self.vbo
         self.shared_program.frag['color'] = tuple(rgba)
-        self.shared_program['time'] = self._time
-        self.timer.start()
 
     def _prepare_transforms(self, view):
-        # This method is called when the user or the scenegraph has assigned
-        # new transforms to this visual (ignore the *view* argument for now;
-        # we'll get to that later). This method is thus responsible for
-        # connecting the proper transform functions to the shader program.
-
-        # The most common approach here is to simply take the complete
-        # transformation from visual coordinates to render coordinates. Later
-        # tutorials detail more complex transform handling.
         view.view_program.vert['transform'] = view.get_transform()
 
     def new_pose(self, new_x, new_y, new_th):
@@ -130,15 +115,6 @@ class BoatVisual(visuals.Visual):
         # print vertices
         self.vbo = gloo.VertexBuffer(vertices)
         self.shared_program.vert['position'] = self.vbo
-
-    def update_time(self, event):  # argument event is required for scene, but doesn't have to be used
-        t = ptime.time()
-        self._time += t - self._last_time
-        self._last_time = t
-        self.shared_program['time'] = self._time
-        x = np.round(100.*(t - self._first_time), 3)
-        self.new_pose(x, x, np.random.uniform(0, 2*np.pi, (1,)))
-        #self.update()
 
 
 # set up a Canvas and TransformSystem for drawing
@@ -172,19 +148,34 @@ view_2 = scene.widgets.ViewBox(parent=canvas.scene, name="data_view", margin=0, 
 boats = [BoatNode(10.*arena_width/real_width + arena_width/2.0, -1*0.*arena_height/real_height + arena_height/2.0, 0, 20, 40, (0, .6, .6, 1), parent=canvas.scene),
          BoatNode(-28.*arena_width/real_width + arena_width/2.0, -1*-29.*arena_height/real_height + arena_height/2.0, 0, 20, 40, (.6, 0, 0, 1), parent=canvas.scene)]
 
-textboxes = [TextNode("t = ", pos=(100, 100), parent=canvas.scene)]
+textboxes = [TextNode("t = ", pos=(arena_width+100, 30), parent=canvas.scene, bold=True, font_size=30)]
 
 boats[1].new_pose(100, 100, 45*np.pi/180.)
 
 
+def format_time_string(time, decimals):
+    time = np.round(time, decimals)
+    if decimals == 0:
+        return "{}".format(int(time))
+    fraction = time - np.floor(time)
+    fraction_as_integer = "{}".format(int(np.power(10, decimals)*fraction))
+    return "{}.{}".format(int(time), fraction_as_integer)
+
+
 # a general timer and the function that is called each tick
 first_time = ptime.time()
+last_time = 0
 def iterate(event):
+    global first_time
+    global last_time
     current_time = ptime.time() - first_time
-    textboxes[0].text = "t = {:.4}".format(current_time)
-    x = np.round(100.*(current_time - first_time), 4)
-    #boats[0].shared_program['time'] = current_time
-    boats[0].new_pose(x, x, np.random.uniform(0, 2*np.pi, (1,)))
+    dt = current_time - last_time
+    last_time = current_time
+    print dt
+    textboxes[0].text = "t = {}".format(format_time_string(current_time, 2))
+    x = np.round(100.*current_time, 4)
+    boats[0].new_pose(x, x, np.pi*current_time)
+    boats[1].new_pose(10*np.random.randn() + x, 10*np.random.randn() + x, np.random.uniform(0, 2 * np.pi, (1,)))
     canvas.update()
 
 # create the general timer, runs a callback
