@@ -18,6 +18,15 @@ void main() {
 """
 
 
+def format_time_string(time, decimals):
+    time = np.round(time, decimals)
+    if decimals == 0:
+        return "{}".format(int(time))
+    fraction = time - np.floor(time)
+    fraction_as_integer = "{}".format(int(np.power(10, decimals)*fraction))
+    return "{}.{}".format(int(time), fraction_as_integer)
+
+
 class BoatCanvas(app.Canvas):
     """
 
@@ -117,6 +126,7 @@ class BoatVisual(visuals.Visual):
         self.shared_program.vert['position'] = self.vbo
 
 
+"""
 # set up a Canvas and TransformSystem for drawing
 # An easier approach is to make the visual usable in a scenegraph, in which
 # case the canvas will take care of drawing the visual and setting up the
@@ -153,15 +163,6 @@ textboxes = [TextNode("t = ", pos=(arena_width+100, 30), parent=canvas.scene, bo
 boats[1].new_pose(100, 100, 45*np.pi/180.)
 
 
-def format_time_string(time, decimals):
-    time = np.round(time, decimals)
-    if decimals == 0:
-        return "{}".format(int(time))
-    fraction = time - np.floor(time)
-    fraction_as_integer = "{}".format(int(np.power(10, decimals)*fraction))
-    return "{}.{}".format(int(time), fraction_as_integer)
-
-
 # a general timer and the function that is called each tick
 first_time = ptime.time()
 last_time = 0
@@ -181,6 +182,6 @@ def iterate(event):
 # create the general timer, runs a callback
 overall_timer = app.Timer('auto', connect=iterate, start=True)
 
-
+"""
 if __name__ == '__main__':
     app.run()

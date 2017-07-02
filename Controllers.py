@@ -166,7 +166,7 @@ class PointAndShootPID(Controller):
 
 class QLearnPointAndShoot(Controller):
     def __init__(self, boat, positionThreshold_in=1.0, learning_rate=0.2):
-        super(PointAndShootPID, self).__init__()
+        super(QLearnPointAndShoot, self).__init__()
         self._boat = boat
         self.time = boat.time
         self._positionThreshold = positionThreshold_in

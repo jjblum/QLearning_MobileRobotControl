@@ -189,5 +189,5 @@ class DestinationOnly(Strategy):
             self._destinationState = state
 
     def idealState(self):
-        self.boat.plotData = np.atleast_2d(np.array([[self.boat.state[0], self.boat.state[1]], [self._destinationState[0], self._destinationState[1]]]))
+        # self.boat.plotData = np.atleast_2d(np.array([[self.boat.state[0], self.boat.state[1]], [self._destinationState[0], self._destinationState[1]]]))
         self.controller.idealState = self.destinationState  # update this here so the controller doesn't need to import Strategies

@@ -62,6 +62,7 @@ class Boat(object):
         self._strategy = Strategies.DoNothing(self)
         self._design = Designs.TankDriveDesign()
         self._plotData = None  # [x, y] data used to display current actions
+        self._Q = _Q_
 
     @property
     def time(self):
@@ -135,6 +136,14 @@ class Boat(object):
     @plotData.setter
     def plotData(self, plotData_in):
         self._plotData = plotData_in
+
+    @property
+    def Q(self):
+        return self._Q
+
+    @Q.setter
+    def Q(self, Q_in):
+        self._Q = Q_in
 
     def __str__(self):
         return "Boat {ID}: {T} at X = {X}, Y = {Y}, TH = {TH}".format(ID=self.uniqueID,
