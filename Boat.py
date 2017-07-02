@@ -13,6 +13,13 @@ _Q_ = None  # the model representation of the value function
 def wrapToPi(angle):
     return (angle + np.pi) % (2 * np.pi) - np.pi
 
+def wrapTo2Pi(angle):
+    angle = wrapToPi(angle)
+    if angle < 0:
+        angle += 2*np.pi
+    return angle
+
+
 
 def ode(state, t, boat):
     # derivative of state at input state and time
@@ -63,6 +70,8 @@ class Boat(object):
         self._design = Designs.TankDriveDesign()
         self._plotData = None  # [x, y] data used to display current actions
         self._Q = _Q_
+        self._controlHz = 5  # the number of times per second the boat is allowed to change its signal
+        self._lastControlTime = 0
 
     @property
     def time(self):
@@ -176,9 +185,11 @@ class Boat(object):
         return wrapToPi(ga - a)
 
     def control(self):
-        self.strategy.updateFinished()
-        self.strategy.idealState()
-
-        self._thrustFraction, self._momentFraction = self.strategy.actuationEffortFractions()
+        if self.time > self._lastControlTime + 1./self._controlHz:
+            # print "Boat control triggered, t = {:.2f}".format(self.time)
+            self.strategy.updateFinished()
+            self.strategy.idealState()
+            self._thrustFraction, self._momentFraction = self.strategy.actuationEffortFractions()
+            self._lastControlTime = self.time
         self.thrustSurge, self.thrustSway, self.moment = \
             self.design.thrustAndMomentFromFractions(self._thrustFraction, self._momentFraction)

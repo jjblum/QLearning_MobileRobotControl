@@ -8,7 +8,8 @@ from vispy import scene, visuals, app
 from vispy.util import ptime
 
 
-TIME_DILATION = 100.0  # the number of seconds that pass in the program for every real-time second
+TIME_DILATION = 20.0  # the number of seconds that pass in the program for every real-time second
+FAILED_WAYPOINT_TIMEOUT = 30.0  # number of seconds before abandoning a waypoint
 
 
 BoatNode = scene.visuals.create_visual_node(BoatVisual)
@@ -35,27 +36,28 @@ BOAT_VISUALS = [BoatNode(ARENA_CENTER[0], ARENA_CENTER[1], 0, 20, 40, (0, .6, .6
                 BoatNode(ARENA_CENTER[0], ARENA_CENTER[1], 0, 20, 40, (.6, 0, 0, 1), parent=CANVAS.scene)]
 TEXT_BOXES = {"time": TextNode("t = ", pos=(ARENA_WIDTH + 100, 30), parent=CANVAS.scene, bold=True, font_size=30),
               "waypoint_symbol": TextNode("+", pos=(0, 0), parent=CANVAS.scene, bold=True, font_size=40),
-              "waypoint": TextNode("[]", pos=(ARENA_WIDTH + 100, 60), parent=CANVAS.scene, bold=True, font_size=30)}
+              "waypoint": TextNode("[]", pos=(ARENA_WIDTH + 100, 70), parent=CANVAS.scene, bold=True, font_size=30)}
 
 BOATS = [Boat.Boat(), Boat.Boat()]
 
 
 def iterate(event):  # event is unused
-    global FIRST_TIME, LAST_TIME, BOATS, CANVAS, TIME_DILATION
+    global FIRST_TIME, LAST_TIME, BOATS, CANVAS, TIME_DILATION, LAST_COMPLETED_WP_TIME, FAILED_WAYPOINT_TIMEOUT
     current_time = TIME_DILATION*(ptime.time() - FIRST_TIME)
     TEXT_BOXES["time"].text = "t = {}".format(format_time_string(current_time, 2))
     # USE ODE TO PROPAGATE BOAT STATE
-    times = np.linspace(LAST_TIME, current_time, 10)
+    times = np.linspace(LAST_TIME, current_time, 100)
     for i in range(len(BOATS)):
         boat = BOATS[i]
         boat.control()
         boat.time = current_time
         states = spi.odeint(Boat.ode, boat.state, times, (boat,))
         boat.state = states[-1]
-        # print states[-1]
         px, py = xy_location_to_pixel_location(states[-1][0], states[-1][1])
-        BOAT_VISUALS[i].new_pose(px, py, states[-1][2])
-        if boat.strategy.finished:
+        heading = Boat.wrapTo2Pi(states[-1][4])
+        BOAT_VISUALS[i].new_pose(px, py, heading)
+        if boat.strategy.finished or current_time - LAST_COMPLETED_WP_TIME > FAILED_WAYPOINT_TIMEOUT:
+            LAST_COMPLETED_WP_TIME = current_time
             waypoint = np.random.uniform(-ARENA_EDGE_SIZE/2., ARENA_EDGE_SIZE/2., size=[2, ])
             px, py = xy_location_to_pixel_location(waypoint[0], waypoint[1])
             TEXT_BOXES["waypoint_symbol"].pos = (px, py)
@@ -67,6 +69,7 @@ def iterate(event):  # event is unused
 
 FIRST_TIME = ptime.time()
 LAST_TIME = 0
+LAST_COMPLETED_WP_TIME = 0
 GLOBAL_TIMER = app.Timer('auto', connect=iterate, start=True)
 
 

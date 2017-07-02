@@ -106,6 +106,7 @@ class BoatVisual(visuals.Visual):
         self._x = new_x
         self._y = new_y
         self._th = new_th
+        new_th *= -1. # need to flip sign of new_th
         homogeneous_vertices = np.array(
             [
                 [-0.5 * self._l, 0.5 * self._w, 1],
@@ -172,10 +173,10 @@ def iterate(event):
     current_time = ptime.time() - first_time
     dt = current_time - last_time
     last_time = current_time
-    print dt
     textboxes[0].text = "t = {}".format(format_time_string(current_time, 2))
     x = np.round(100.*current_time, 4)
-    boats[0].new_pose(x, x, np.pi*current_time)
+    #boats[0].new_pose(x, x, np.pi*current_time)
+    boats[0].new_pose(x, x, np.pi/2.0)
     boats[1].new_pose(10*np.random.randn() + x, 10*np.random.randn() + x, np.random.uniform(0, 2 * np.pi, (1,)))
     canvas.update()
 
