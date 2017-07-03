@@ -8,7 +8,7 @@ from vispy import scene, visuals, app
 from vispy.util import ptime
 
 
-TIME_DILATION = 5.0  # the number of seconds that pass in the program for every real-time second
+TIME_DILATION = 20.0  # the number of seconds that pass in the program for every real-time second
 FAILED_WAYPOINT_TIMEOUT = 30.0  # number of seconds before abandoning a waypoint
 WAYPOINTS_BEFORE_RESET = 10  # the number of waypoints attempted before the boats reset to the center. A "batch"
 
@@ -33,10 +33,10 @@ DATA_VIEW = scene.widgets.ViewBox(parent=CANVAS.scene, name="data_view", margin=
 
 # Create two instances of the visual, each using canvas.scene as their parent
 BOAT_VISUALS = {"pid": BoatNode(ARENA_CENTER[0], ARENA_CENTER[1], 0, 20, 40, (0, .6, .6, 1), parent=CANVAS.scene),
-                "q": BoatNode(ARENA_CENTER[0], ARENA_CENTER[1], 0, 20, 40, (.6, 0, 0, 1), parent=CANVAS.scene)}
+                "q": BoatNode(ARENA_CENTER[0], ARENA_CENTER[1], 0, 10, 30, (.6, 0, 0, 1), parent=CANVAS.scene)}
 TEXT_BOXES = {"time": TextNode("t = ", pos=(ARENA_WIDTH + 100, 30), parent=CANVAS.scene, bold=True, font_size=30),
               "waypoint_symbol": {"pid": TextNode("+", pos=(0, 0), parent=CANVAS.scene, bold=True, font_size=40, color=(0, .6, .6, 1)),
-                                  "q": TextNode("+", pos=(0, 0), parent=CANVAS.scene, bold=True, font_size=40, color=(.6, 0, 0, 1))},
+                                  "q": TextNode("o", pos=(0, 0), parent=CANVAS.scene, bold=True, font_size=40, color=(.6, 0, 0, 1))},
               "waypoint_text": {"pid": TextNode("[]", pos=(ARENA_WIDTH + 100, 70), parent=CANVAS.scene, bold=True, font_size=30, color=(0, .6, .6)),
                                 "q": TextNode("[]", pos=(ARENA_WIDTH + 300, 70), parent=CANVAS.scene, bold=True, font_size=30, color=(.6, 0, 0, 1))},
               "waypoint_count": {"pid": TextNode("#", pos=(ARENA_WIDTH + 100, 110), parent=CANVAS.scene, bold=True, font_size=30, color=(0, .6, .6)),
@@ -56,6 +56,7 @@ WAYPOINT_QUEUE = list()
 
 def iterate(event):  # event is unused
     global FIRST_TIME, LAST_TIME, BOATS, CANVAS, TIME_DILATION, LAST_COMPLETED_WP_TIME, FAILED_WAYPOINT_TIMEOUT, WAYPOINTS_INDEX, CONTROLLERS, WAYPOINT_QUEUE
+    global TEXT_BOXES
     current_time = TIME_DILATION*(ptime.time() - FIRST_TIME)
     TEXT_BOXES["time"].text = "t = {}".format(format_time_string(current_time, 2))
     # USE ODE TO PROPAGATE BOAT STATE
@@ -81,7 +82,8 @@ def iterate(event):  # event is unused
                 boat.strategy = Strategies.DestinationOnly(boat, waypoint, controller_name=CONTROLLERS[k])
     if not WAYPOINTS_INDEX["pid"] < WAYPOINTS_BEFORE_RESET or not WAYPOINTS_INDEX["q"] < WAYPOINTS_BEFORE_RESET:
         reset_boats()
-    LAST_TIME = current_time
+    else:
+        LAST_TIME = current_time
     CANVAS.update()
 
 
@@ -99,26 +101,37 @@ def xy_location_to_pixel_location(x, y):
     return px, py
 
 
+# TODO: generate an actual random set each time. same seed produces exact same queue.
+# TODO: need to reset last completed WP time too
+
 def generate_random_waypoints_queue():
     global WAYPOINTS_BEFORE_RESET, WAYPOINT_QUEUE, ARENA_EDGE_SIZE
+    WAYPOINT_QUEUE = list()
     for i in range(WAYPOINTS_BEFORE_RESET):
         waypoint = np.random.uniform(-ARENA_EDGE_SIZE/2., ARENA_EDGE_SIZE/2., size=[2, ])
         WAYPOINT_QUEUE.append(waypoint)
 
 
 def reset_boats():
-    global BOATS, CONTROLLERS, WAYPOINT_QUEUE, WAYPOINTS_INDEX, WAYPOINTS_BEFORE_RESET
+    global BOATS, CONTROLLERS, WAYPOINT_QUEUE, WAYPOINTS_INDEX, WAYPOINTS_BEFORE_RESET, LAST_COMPLETED_WP_TIME, LAST_TIME, FIRST_TIME
+    BOATS = {"pid": Boat.Boat(),
+             "q": Boat.Boat()}
     # generate all the random waypoints
     generate_random_waypoints_queue()
     waypoint = WAYPOINT_QUEUE[0]
     px, py = xy_location_to_pixel_location(waypoint[0], waypoint[1])
+    LAST_TIME = 0
+    FIRST_TIME = ptime.time()
     for k in BOATS:
+        boat = BOATS[k]
         WAYPOINTS_INDEX[k] = 0
-        BOATS[k].state = np.zeros((6,))
+        LAST_COMPLETED_WP_TIME[k] = 0
+        boat.state = np.zeros((6,))
+        boat.time = 0
         TEXT_BOXES["waypoint_symbol"][k].pos = (px, py)
         TEXT_BOXES["waypoint_text"][k].text = "[{:.0f}, {:.0f}]".format(px, py)
         TEXT_BOXES["waypoint_count"][k].text = "#{} of {}".format(WAYPOINTS_INDEX[k] + 1, WAYPOINTS_BEFORE_RESET)
-        BOATS[k].strategy = Strategies.DestinationOnly(BOATS[k], waypoint, controller_name=CONTROLLERS[k])
+        boat.strategy = Strategies.DestinationOnly(boat, waypoint, controller_name=CONTROLLERS[k])
 
 
 def setup():
