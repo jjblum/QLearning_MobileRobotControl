@@ -7,10 +7,18 @@ from visualization_scene import BoatVisual, format_time_string
 from vispy import scene, visuals, app
 from vispy.util import ptime
 
-
+######################################################
+######################################################
+#                   USER SETTINGS  ###################
+######################################################
+######################################################
 TIME_DILATION = 20.0  # the number of seconds that pass in the program for every real-time second
 FAILED_WAYPOINT_TIMEOUT = 30.0  # number of seconds before abandoning a waypoint
 WAYPOINTS_BEFORE_RESET = 10  # the number of waypoints attempted before the boats reset to the center. A "batch"
+######################################################
+######################################################
+######################################################
+######################################################
 
 BoatNode = scene.visuals.create_visual_node(BoatVisual)
 TextNode = scene.visuals.create_visual_node(visuals.TextVisual)
@@ -36,7 +44,7 @@ BOAT_VISUALS = {"pid": BoatNode(ARENA_CENTER[0], ARENA_CENTER[1], 0, 20, 40, (0,
                 "q": BoatNode(ARENA_CENTER[0], ARENA_CENTER[1], 0, 10, 30, (.6, 0, 0, 1), parent=CANVAS.scene)}
 TEXT_BOXES = {"time": TextNode("t = ", pos=(ARENA_WIDTH + 100, 30), parent=CANVAS.scene, bold=True, font_size=30),
               "waypoint_symbol": {"pid": TextNode("+", pos=(0, 0), parent=CANVAS.scene, bold=True, font_size=40, color=(0, .6, .6, 1)),
-                                  "q": TextNode("o", pos=(0, 0), parent=CANVAS.scene, bold=True, font_size=40, color=(.6, 0, 0, 1))},
+                                  "q": TextNode("o", pos=(0, 0), parent=CANVAS.scene, bold=True, font_size=30, color=(.6, 0, 0, 1))},
               "waypoint_text": {"pid": TextNode("[]", pos=(ARENA_WIDTH + 100, 70), parent=CANVAS.scene, bold=True, font_size=30, color=(0, .6, .6)),
                                 "q": TextNode("[]", pos=(ARENA_WIDTH + 300, 70), parent=CANVAS.scene, bold=True, font_size=30, color=(.6, 0, 0, 1))},
               "waypoint_count": {"pid": TextNode("#", pos=(ARENA_WIDTH + 100, 110), parent=CANVAS.scene, bold=True, font_size=30, color=(0, .6, .6)),
@@ -113,7 +121,7 @@ def generate_random_waypoints_queue():
 
 
 def reset_boats():
-    global BOATS, CONTROLLERS, WAYPOINT_QUEUE, WAYPOINTS_INDEX, WAYPOINTS_BEFORE_RESET, LAST_COMPLETED_WP_TIME, LAST_TIME, FIRST_TIME
+    global BOATS, CONTROLLERS, WAYPOINT_QUEUE, WAYPOINTS_INDEX, WAYPOINTS_BEFORE_RESET, LAST_COMPLETED_WP_TIME, LAST_TIME, FIRST_TIME, TEXT_BOXES
     BOATS = {"pid": Boat.Boat(),
              "q": Boat.Boat()}
     # generate all the random waypoints
