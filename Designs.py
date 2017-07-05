@@ -2,6 +2,19 @@ import numpy as np
 import abc
 
 
+def scale_down(m0raw, m1raw):
+    # scale down such that the ratio of m0/m1 is maintained but the max absolute value is 1.0
+    m0, m1 = m0raw, m1raw
+    if np.abs(m0raw) > 1. or np.abs(m1raw) > 1.:
+        if np.abs(m0raw) > np.abs(m1raw):
+            m0 = m0raw/np.abs(m0raw)
+            m1 = m1raw/np.abs(m0raw)
+        else:
+            m0 = m0raw/np.abs(m1raw)
+            m1 = m1raw/np.abs(m1raw)
+    return m0, m1
+
+
 class Design(object):
     # abstract class, a design dictates how actuation fractions are translated into actual thrust and moment
     # e.g. a tank-drive propeller boat will behave differently than a vectored-thrust boat
@@ -68,7 +81,6 @@ class TankDriveDesign(Lutra):
         self._maxBackwardThrustPerMotor = 10.0  # back-driving motors is much weaker, or a propguard lowers this thrust
         self._momentArm = 0.3556  # distance between the motors [m]
         # below 1 m/s, you should probably just turn in place!
-        self._maxHeadingRate = 0.403  # [rad/s]
         self._thCoeff = 2.54832785865
         self._rCoeff = 0.401354269952
         self._u0Coeff = 0.0914788305811
@@ -88,11 +100,10 @@ class TankDriveDesign(Lutra):
     def thrustAndMomentFromFractions(self, thrustFraction, momentFraction):
         thrustSway = 0.0
 
-        m0 = np.clip(thrustFraction + momentFraction, -1.0, 1.0)
-        m1 = np.clip(thrustFraction - momentFraction, -1.0, 1.0)
+        m0, m1 = scale_down(thrustFraction + momentFraction, thrustFraction - momentFraction)
 
         if m0 > 0:
-            t0 = self._maxForwardThrustPerMotor*m0
+            t0 = 0.75*self._maxForwardThrustPerMotor*m0  # imbalanced, as if the prop has chipped
         else:
             t0 = self._maxBackwardThrustPerMotor*m0
 

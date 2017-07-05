@@ -30,6 +30,8 @@ class UniversalPID(object):
         self._errorDerivative = 0.0
         if dt > 0:
             self._errorDerivative = (error - self._errorOld)/dt
+            #if self._name == "heading_PID":
+            #    self._errorDerivative -= self._boat.state[5]  # in the phone app, they use rudder_pids[2]*(angle_destination_change - drz) where drz is the gyro
         self._errorAccumulation += dt*error
         #if self._name == "heading_PID":
             #print "{}: e = {}, P term = {}, I term = {}, D term = {}".format(self._name, error, self._P*error, self._I*self._errorAccumulation, self._D*self._errorDerivative)
@@ -128,18 +130,18 @@ class PointAndShootPID(Controller):
         self._positionThreshold = positionThreshold_in
 
     def actuationEffortFractions(self):
-        thrustFraction = 0.0
-        momentFraction = 0.0
         state = self.boat.state
 
         error_x = self.idealState[0] - state[0]
         error_y = self.idealState[1] - state[1]
         error_pos = math.sqrt(math.pow(error_x, 2.0) + math.pow(error_y, 2.0))
+        # print self._boat.name + ": position error = {}".format(error_pos)
 
         # if the position error is less than some threshold and velocity is near zero, turn thrustFraction to 0
         if error_pos < self._positionThreshold:
             # because this is where we might set finished to True, it
             # needs to be before any other returns that might make it impossible to reach
+            # print self._boat.name + ": reached destination"
             self.finished = True
             return 0.0, 0.0
 
@@ -157,9 +159,8 @@ class PointAndShootPID(Controller):
         clippedAngleError = np.clip(math.fabs(error_th), 0.0, self._headingErrorSurgeCutoff)
         thrustReductionRatio = math.cos(math.pi/2.0*clippedAngleError/self._headingErrorSurgeCutoff)
         momentFraction = np.clip(error_th_signal, -1.0, 1.0)
-        #thrustFraction = np.clip(error_pos_signal, -thrustReductionRatio, thrustReductionRatio)
         thrustFraction = np.clip(error_pos_signal, -1.0, 1.0)
-        thrustFraction = thrustFraction*thrustReductionRatio
+        thrustFraction *= thrustReductionRatio
 
         return thrustFraction, momentFraction
 
@@ -174,16 +175,11 @@ class QLearnPointAndShoot(Controller):
 
     def actuationEffortFractions(self):
         # use state of the boat and the ideal state to determine an action to take
-        # TODO
+        # TODO:  all of this
 
-        state = self.boat.state
-        error_x = self.idealState[0] - state[0]
-        error_y = self.idealState[1] - state[1]
-        error_pos = math.sqrt(math.pow(error_x, 2.0) + math.pow(error_y, 2.0))
+        total_state = list()
+        boat_state = self.boat.state
 
-        # if the position error is less than some threshold and velocity is near zero, turn thrustFraction to 0
-        if error_pos < self._positionThreshold:
-            self.finished = True
-            return 0.0, 0.0
+
 
         return 0., 0.

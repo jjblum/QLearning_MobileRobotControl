@@ -12,7 +12,7 @@ from vispy.util import ptime
 #                   USER SETTINGS  ###################
 ######################################################
 ######################################################
-TIME_DILATION = 20.0  # the number of seconds that pass in the program for every real-time second
+TIME_DILATION = 10.0  # the number of seconds that pass in the program for every real-time second
 FAILED_WAYPOINT_TIMEOUT = 30.0  # number of seconds before abandoning a waypoint
 WAYPOINTS_BEFORE_RESET = 10  # the number of waypoints attempted before the boats reset to the center. A "batch"
 ######################################################
@@ -40,15 +40,25 @@ ARENA_VIEW = scene.widgets.ViewBox(parent=CANVAS.scene, name="arena_view", margi
 DATA_VIEW = scene.widgets.ViewBox(parent=CANVAS.scene, name="data_view", margin=0, bgcolor=(0.8, 0.8, 0.8, 1), size=(DATA_WIDTH, DATA_HEIGHT), pos=(ARENA_WIDTH, 0))
 
 # Create two instances of the visual, each using canvas.scene as their parent
-BOAT_VISUALS = {"pid": BoatNode(ARENA_CENTER[0], ARENA_CENTER[1], 0, 20, 40, (0, .6, .6, 1), parent=CANVAS.scene),
-                "q": BoatNode(ARENA_CENTER[0], ARENA_CENTER[1], 0, 10, 30, (.6, 0, 0, 1), parent=CANVAS.scene)}
+
+COLORS = {"pid": (0, .6, .6, 1),
+          "q": (.6, 0, 0, 1)}
+
+BOAT_VISUALS = {"pid": BoatNode(ARENA_CENTER[0], ARENA_CENTER[1], 0, 20, 40, COLORS["pid"], parent=CANVAS.scene),
+                "q": BoatNode(ARENA_CENTER[0], ARENA_CENTER[1], 0, 20, 40, COLORS["q"], parent=CANVAS.scene)}
+
+NAVIGATION_LINES = {"pid": scene.visuals.Line(pos=np.zeros((2, 2), dtype=np.float32), color=COLORS["pid"], parent=CANVAS.scene),
+                    "q": scene.visuals.Line(pos=np.zeros((2, 2), dtype=np.float32), color=COLORS["q"], parent=CANVAS.scene)}
+NAVIGATION_LINES["pid"].transform = scene.transforms.STTransform()
+NAVIGATION_LINES["q"].transform = scene.transforms.STTransform()
+
 TEXT_BOXES = {"time": TextNode("t = ", pos=(ARENA_WIDTH + 100, 30), parent=CANVAS.scene, bold=True, font_size=30),
-              "waypoint_symbol": {"pid": TextNode("+", pos=(0, 0), parent=CANVAS.scene, bold=True, font_size=40, color=(0, .6, .6, 1)),
-                                  "q": TextNode("o", pos=(0, 0), parent=CANVAS.scene, bold=True, font_size=30, color=(.6, 0, 0, 1))},
-              "waypoint_text": {"pid": TextNode("[]", pos=(ARENA_WIDTH + 100, 70), parent=CANVAS.scene, bold=True, font_size=30, color=(0, .6, .6)),
-                                "q": TextNode("[]", pos=(ARENA_WIDTH + 300, 70), parent=CANVAS.scene, bold=True, font_size=30, color=(.6, 0, 0, 1))},
-              "waypoint_count": {"pid": TextNode("#", pos=(ARENA_WIDTH + 100, 110), parent=CANVAS.scene, bold=True, font_size=30, color=(0, .6, .6)),
-                                 "q": TextNode("#", pos=(ARENA_WIDTH + 300, 110), parent=CANVAS.scene, bold=True, font_size=30, color=(.6, 0, 0, 1))}}
+              "waypoint_symbol": {"pid": TextNode("+", pos=(0, 0), parent=CANVAS.scene, bold=True, font_size=40, color=COLORS["pid"]),
+                                  "q": TextNode("o", pos=(0, 0), parent=CANVAS.scene, bold=True, font_size=30, color=COLORS["q"])},
+              "waypoint_text": {"pid": TextNode("[]", pos=(ARENA_WIDTH + 100, 70), parent=CANVAS.scene, bold=True, font_size=30, color=COLORS["pid"]),
+                                "q": TextNode("[]", pos=(ARENA_WIDTH + 300, 70), parent=CANVAS.scene, bold=True, font_size=30, color=COLORS["q"])},
+              "waypoint_count": {"pid": TextNode("#", pos=(ARENA_WIDTH + 100, 110), parent=CANVAS.scene, bold=True, font_size=30, color=COLORS["pid"]),
+                                 "q": TextNode("#", pos=(ARENA_WIDTH + 300, 110), parent=CANVAS.scene, bold=True, font_size=30, color=COLORS["q"])}}
 
 BOATS = {"pid": Boat.Boat(),
          "q": Boat.Boat()}
@@ -59,19 +69,30 @@ WAYPOINTS_INDEX = {"pid": 0,
 CONTROLLERS = {"pid": "PointAndShoot",
                "q": "QLearnPointAndShoot"}
 
+EXPERIENCES = {"pid": list(),
+               "q": list()}
+
 WAYPOINT_QUEUE = list()
+
+TOTAL_ITERATIONS = 0
 
 
 def iterate(event):  # event is unused
     global FIRST_TIME, LAST_TIME, BOATS, CANVAS, TIME_DILATION, LAST_COMPLETED_WP_TIME, FAILED_WAYPOINT_TIMEOUT, WAYPOINTS_INDEX, CONTROLLERS, WAYPOINT_QUEUE
-    global TEXT_BOXES
+    global TEXT_BOXES, EXPERIENCES, TOTAL_ITERATIONS, NAVIGATION_LINES
+    if TOTAL_ITERATIONS < 1:
+        FIRST_TIME = ptime.time()  # there is a huge gap in time as the window opens, so we need this manual time reset for the very first iteration
+    TOTAL_ITERATIONS += 1
     current_time = TIME_DILATION*(ptime.time() - FIRST_TIME)
+    # print "Total iterations = {}, t = {}".format(TOTAL_ITERATIONS, current_time)
     TEXT_BOXES["time"].text = "t = {}".format(format_time_string(current_time, 2))
     # USE ODE TO PROPAGATE BOAT STATE
     times = np.linspace(LAST_TIME, current_time, 100)
     for k in BOATS:
         boat = BOATS[k]
         boat.control()
+        # if the boat actually changes action, we should create a Q learning experience
+        # (i.e. BEFORE we change actions here, the state before ode is s' in (s, a, r, s')
         boat.time = current_time
         states = spi.odeint(Boat.ode, boat.state, times, (boat,))
         boat.state = states[-1]
@@ -79,12 +100,14 @@ def iterate(event):  # event is unused
         heading = Boat.wrapTo2Pi(states[-1][4])
         BOAT_VISUALS[k].new_pose(px, py, heading)
         if boat.strategy.finished or current_time - LAST_COMPLETED_WP_TIME[k] > FAILED_WAYPOINT_TIMEOUT:
+
             WAYPOINTS_INDEX[k] += 1
             LAST_COMPLETED_WP_TIME[k] = current_time
             if WAYPOINTS_INDEX[k] < len(WAYPOINT_QUEUE):
                 waypoint = WAYPOINT_QUEUE[WAYPOINTS_INDEX[k]]
                 px, py = xy_location_to_pixel_location(waypoint[0], waypoint[1])
-                TEXT_BOXES["waypoint_symbol"][k].pos = (px, py)
+                NAVIGATION_LINES[k].set_data(pos=np.array([(px, py), xy_location_to_pixel_location(boat.state[0], boat.state[1])], dtype=np.float32))
+                TEXT_BOXES["waypoint_symbol"][k].pos = (px, py+15)  # py-0.5*fontsize to center the text vertically
                 TEXT_BOXES["waypoint_text"][k].text = "[{:.0f}, {:.0f}]".format(px, py)
                 TEXT_BOXES["waypoint_count"][k].text = "#{} of {}".format(WAYPOINTS_INDEX[k]+1, WAYPOINTS_BEFORE_RESET)
                 boat.strategy = Strategies.DestinationOnly(boat, waypoint, controller_name=CONTROLLERS[k])
@@ -95,7 +118,7 @@ def iterate(event):  # event is unused
     CANVAS.update()
 
 
-FIRST_TIME = ptime.time()
+FIRST_TIME = 0
 LAST_TIME = 0
 LAST_COMPLETED_WP_TIME = {"pid": 0,
                           "q": 0}
@@ -108,9 +131,6 @@ def xy_location_to_pixel_location(x, y):
     # print "{},{}  -->  {},{}".format(x, y, px, py)
     return px, py
 
-
-# TODO: generate an actual random set each time. same seed produces exact same queue.
-# TODO: need to reset last completed WP time too
 
 def generate_random_waypoints_queue():
     global WAYPOINTS_BEFORE_RESET, WAYPOINT_QUEUE, ARENA_EDGE_SIZE
@@ -136,6 +156,8 @@ def reset_boats():
         LAST_COMPLETED_WP_TIME[k] = 0
         boat.state = np.zeros((6,))
         boat.time = 0
+        boat.name = k + " boat"
+        NAVIGATION_LINES[k].set_data(pos=np.array([(px, py), xy_location_to_pixel_location(boat.state[0], boat.state[1])], dtype=np.float32))
         TEXT_BOXES["waypoint_symbol"][k].pos = (px, py)
         TEXT_BOXES["waypoint_text"][k].text = "[{:.0f}, {:.0f}]".format(px, py)
         TEXT_BOXES["waypoint_count"][k].text = "#{} of {}".format(WAYPOINTS_INDEX[k] + 1, WAYPOINTS_BEFORE_RESET)
@@ -147,14 +169,17 @@ def setup():
     pid_boat = BOATS["pid"]
     pid_boat.design = Designs.TankDriveDesign()
     pid_boat.time = 0
+    pid_boat.name = "pid boat"
 
     q_boat = BOATS["q"]
     q_boat.design = Designs.TankDriveDesign()
     q_boat.time = 0
+    q_boat.name = "q boat"
 
     reset_boats()
 
 
 if __name__ == "__main__":
     setup()
+    CANVAS.update()
     app.run()

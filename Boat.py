@@ -3,22 +3,23 @@ import math
 import copy
 import Strategies
 import Designs
+import QFunctionApprox
 
 __author__ = 'jjb'
 
-
-_Q_ = None  # the model representation of the value function
+# the model representation of the value function, shared by both the example PID boat and the Q learning boat
+_Q_ = QFunctionApprox.QFunctionApproximator()
 
 
 def wrapToPi(angle):
     return (angle + np.pi) % (2 * np.pi) - np.pi
+
 
 def wrapTo2Pi(angle):
     angle = wrapToPi(angle)
     if angle < 0:
         angle += 2*np.pi
     return angle
-
 
 
 def ode(state, t, boat):
@@ -56,8 +57,9 @@ def ode(state, t, boat):
 
 class Boat(object):
 
-    def __init__(self, t=0.0):
+    def __init__(self, t=0.0, name="boat"):
         self._t = t  # current time [s]
+        self._name = name
         self._state = np.zeros((6,))
         self._idealState = np.zeros((6,))  # a "rabbit" boat to chase
         # state: [x y u w th thdot]
@@ -69,9 +71,17 @@ class Boat(object):
         self._strategy = Strategies.DoNothing(self)
         self._design = Designs.TankDriveDesign()
         self._plotData = None  # [x, y] data used to display current actions
-        self._Q = _Q_
-        self._controlHz = 5  # the number of times per second the boat is allowed to change its signal
+        self._controlHz = 5  # the number of times per second the boat is allowed to change its signal, check if strategy is finished, and create Q experiences
         self._lastControlTime = 0
+        self._Q = _Q_
+        self._Qstate = np.zeros((10,))  # [u w alpha delta phi alphadot deltadot phidot m0_signal m1_signal]
+        self._QlastState = np.zeros((10,))  # the starting state
+        # alpha = progress along line between origin and waypoint, normalized by the length of the line
+        # delta = distance to the line (projection of boat onto the line)
+        # phi = angle of the line with respect to the surge direction in the body frame
+        # mX_signal = raw signal value of actuator X
+        self._QExperienceQueue = list()  # a list containing the current set of experiences in the order they were created
+        self._lastExperienceTime = 0
 
     @property
     def time(self):
@@ -83,20 +93,20 @@ class Boat(object):
         self.strategy.time = t
 
     @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, name_in):
+        self._name = name_in
+
+    @property
     def state(self):
         return self._state
 
     @state.setter
     def state(self, state_in):
         self._state = state_in
-
-    @property
-    def type(self):
-        return self._type
-
-    @type.setter
-    def type(self, type_in):
-        self._type = type_in
 
     @property
     def thrustSurge(self):
@@ -186,10 +196,27 @@ class Boat(object):
 
     def control(self):
         if self.time > self._lastControlTime + 1./self._controlHz:
+            # print self._name + ": control() iteration, t = {}".format(self._t)
             # print "Boat control triggered, t = {:.2f}".format(self.time)
             self.strategy.updateFinished()
+
+            self.createExperience()  # run this before changing control
+
             self.strategy.idealState()
             self._thrustFraction, self._momentFraction = self.strategy.actuationEffortFractions()
             self._lastControlTime = self.time
-        self.thrustSurge, self.thrustSway, self.moment = \
-            self.design.thrustAndMomentFromFractions(self._thrustFraction, self._momentFraction)
+
+
+            # TODO: create an exponential delay so that changing signals does not immediately create changes in thrust and moment
+            self.thrustSurge, self.thrustSway, self.moment = \
+                self.design.thrustAndMomentFromFractions(self._thrustFraction, self._momentFraction)
+
+    def createExperience(self):
+        # take previous state (s), previous action (a), current reward (r), and current state (s')
+        previous_state = self._QlastState
+        previous_action = []
+
+        # calculate new Q state
+        self._QExperienceQueue.append(tuple())
+
+

@@ -155,12 +155,12 @@ class DoNothing(Strategy):
 
 class DestinationOnly(Strategy):
     # a strategy that only returns the final destination location
-    def __init__(self, boat, destination, positionThreshold=3.0, controller_name="PointAndShoot"):
+    def __init__(self, boat, destination, positionThreshold=1.0, controller_name="PointAndShoot"):
         super(DestinationOnly, self).__init__(boat)
         self._destinationState = destination
         if controller_name == "PointAndShoot":
-            THRUST_PID = [1, 0, 0]  #[0.5, 0.01, 10.00]  # P, I, D
-            HEADING_PID = [1, 0, 0]  #[1.0, 0.0, 1.0]  # P, I, D
+            THRUST_PID = [0.5, 0, 0]  #[0.5, 0.01, 10.00]  # P, I, D
+            HEADING_PID = [1.0, 0, 0]  #[1.0, 0.0, 1.0]  # P, I, D
             HEADING_ERROR_SURGE_CUTOFF_ANGLE = 180.0  # [degrees of heading error at which thrust is forced to be zero, follows a half-cosine shape]
             self.controller = Controllers.PointAndShootPID(boat, THRUST_PID, HEADING_PID, HEADING_ERROR_SURGE_CUTOFF_ANGLE, positionThreshold)
         elif controller_name == "QLearnPointAndShoot":
