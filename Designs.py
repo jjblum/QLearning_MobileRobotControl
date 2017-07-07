@@ -25,7 +25,7 @@ class Design(object):
         self._momentOfInertia = 0.0  # [kg/m^2]
         self._dragAreas = [0.0, 0.0, 0.0]  # surge, sway, rotation [m^2]
         self._dragCoeffs = [0.0, 0.0, 0.0]  # surge, sway, rotation [-]
-        self._actuator_signals = [0.0, 0.0]  # signal 0, signal 1
+        self._actuator_signals = np.zeros((2,))  # signal 0, signal 1
 
     @abc.abstractmethod
     def thrustAndMomentFromFractions(self, thrustFraction, momentFraction):

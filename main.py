@@ -94,6 +94,7 @@ def iterate(event):  # event is unused
         boat.control()
         # if the boat actually changes action, we should create a Q learning experience
         # (i.e. BEFORE we change actions here, the state before ode is s' in (s, a, r, s')
+        # The experience is created in boat.control() right before new actions are selected
         boat.time = current_time
         states = spi.odeint(Boat.ode, boat.state, times, (boat,))
         boat.state = states[-1]
@@ -101,7 +102,6 @@ def iterate(event):  # event is unused
         heading = Boat.wrapTo2Pi(states[-1][4])
         BOAT_VISUALS[k].new_pose(px, py, heading)
         if boat.strategy.finished or current_time - LAST_COMPLETED_WP_TIME[k] > FAILED_WAYPOINT_TIMEOUT:
-
             WAYPOINTS_INDEX[k] += 1
             LAST_COMPLETED_WP_TIME[k] = current_time
             if WAYPOINTS_INDEX[k] < len(WAYPOINT_QUEUE):
@@ -166,6 +166,8 @@ def reset_boats():
         TEXT_BOXES["waypoint_text"][k].text = "[{:.0f}, {:.0f}]".format(px, py)
         TEXT_BOXES["waypoint_count"][k].text = "#{} of {}".format(WAYPOINTS_INDEX[k] + 1, WAYPOINTS_BEFORE_RESET)
         boat.strategy = Strategies.DestinationOnly(boat, waypoint, controller_name=CONTROLLERS[k])
+        boat.sourceLocation = boat.state[0:2]
+        boat.destinationLocation = waypoint
         boat.calculateQState()  # need to initialize the state for Q learning
 
 

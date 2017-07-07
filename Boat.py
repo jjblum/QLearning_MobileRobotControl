@@ -219,6 +219,7 @@ class Boat(object):
             # print "Boat control triggered, t = {:.2f}".format(self.time)
             self.strategy.updateFinished()
 
+            self._QlastAction = self.design.actuatorSignals
             self.createExperience()  # run this before changing control
 
             self.strategy.idealState()
@@ -229,23 +230,54 @@ class Boat(object):
             self.thrustSurge, self.thrustSway, self.moment = \
                 self.design.thrustAndMomentFromFractions(self._thrustFraction, self._momentFraction)
 
-    def calculateQState(self):
-        # [u w alpha delta phi alphadot deltadot phidot]
+    def sourceToDestinationLine(self):
+        """
+        Calculate some useful information about the line between boat source and destination locations
+        :return L (the length of the line
+        :return theta (the angle of the line
+        :return phi (the angle of the line with respect to current boat surge direction)
+        :return alpha (the current progress of the boat along the line)
+        """
+        source_to_dest = self._destinationLocation - self._sourceLocation
+        source_to_boat = self._state[0:2] - self._sourceLocation
+        boat_to_dest = self._destinationLocation - self._state[0:2]
+        L = np.linalg.norm(source_to_dest)
+        theta = np.arctan2(source_to_dest[1], source_to_dest[0])
+        phi = wrapToPi(theta - self._state[4])
+        alpha = np.linalg.norm(source_to_boat)*np.cos(phi) / L
+        delta = L*alpha*np.sin(phi)
+        return L, theta, phi, alpha, delta
+
+    def distanceFromDestination(self):
+        return np.linalg.norm(self._destinationLocation - self._state[0:2])
+
+    def projectVelocityOntoSourceDestLine(self, L, phi):
+        # normalize the parallel component by length of the line to create alphadot
         u = self._state[2]
         w = self._state[3]
+        parallel = u*np.cos(phi) + w*np.sin(phi)
+        perpendicular = -u*np.sin(phi) + w*np.cos(phi)
+        return parallel/L, perpendicular
+
+    def calculateQState(self):
+        # [u w alpha delta phi alphadot deltadot phidot]
+        L, theta, phi, alpha, delta = self.sourceToDestinationLine()
+        u = self._state[2]
+        w = self._state[3]
+        alphadot, deltadot = self.projectVelocityOntoSourceDestLine(L, phi)
         phidot = self._state[5]
-        self._Qstate = np.array([u, w,                 phidot])
+        self._Qstate = np.array([u, w, alpha, delta, phi, alphadot, deltadot, phidot])
         return
 
     def createExperience(self):
         # take previous state (s), previous action (a), current reward (r), and current state (s')
         previous_state = self._QlastState  # s
         previous_action = self._QlastAction  # a
-        reward = self._Q.reward(RewardFunctions.reward_reachGoalSparse, (previous_state, previous_action, self.destinationLocation, 1.0, 1.0, np.inf))
 
         # calculate new Q state, s'
         self.calculateQState()
         current_state = self._Qstate
+        reward = self._Q.reward(RewardFunctions.reward_reachGoalSparse, (self.distanceFromDestination(), self._state[2], 1.0, 1.0, np.inf))
 
         self._QExperienceQueue.append((previous_state, previous_action, reward, current_state))
         self._QlastState = self._Qstate
