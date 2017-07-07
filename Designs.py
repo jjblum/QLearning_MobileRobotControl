@@ -25,9 +25,7 @@ class Design(object):
         self._momentOfInertia = 0.0  # [kg/m^2]
         self._dragAreas = [0.0, 0.0, 0.0]  # surge, sway, rotation [m^2]
         self._dragCoeffs = [0.0, 0.0, 0.0]  # surge, sway, rotation [-]
-        self._maxHeadingRate = 0.0  # maximum turning speed [rad/s]
-        self._maxForwardThrust = 0.0
-        self._speedVsMinRadius = np.zeros((1, 2))  # 2 column array, speed vs. min turning radius
+        self._actuator_signals = [0.0, 0.0]  # signal 0, signal 1
 
     @abc.abstractmethod
     def thrustAndMomentFromFractions(self, thrustFraction, momentFraction):
@@ -61,6 +59,14 @@ class Design(object):
     @property
     def dragCoeffs(self):
         return self._dragCoeffs
+
+    @property
+    def actuatorSignals(self):
+        return self._actuator_signals
+
+    @actuatorSignals.setter
+    def actuatorSignals(self, actuator_signals_in):
+        self._actuator_signals = actuator_signals_in
 
 
 class Lutra(Design):
@@ -97,11 +103,9 @@ class TankDriveDesign(Lutra):
     def u0Coeff(self):
         return self._u0Coeff
 
-    def thrustAndMomentFromFractions(self, thrustFraction, momentFraction):
-        thrustSway = 0.0
-
-        m0, m1 = scale_down(thrustFraction + momentFraction, thrustFraction - momentFraction)
-
+    def thrustAndMomentFromSignals(self):
+        m0 = self._actuator_signals[0]
+        m1 = self._actuator_signals[1]
         if m0 > 0:
             t0 = 0.75*self._maxForwardThrustPerMotor*m0  # imbalanced, as if the prop has chipped
         else:
@@ -113,5 +117,8 @@ class TankDriveDesign(Lutra):
             t1 = self._maxBackwardThrustPerMotor*m1
         thrustSurge = t0 + t1
         moment = (t1 - t0)/2.0*self._momentArm
+        return thrustSurge, 0.0, moment
 
-        return thrustSurge, thrustSway, moment
+    def thrustAndMomentFromFractions(self, thrustFraction, momentFraction):
+        self.actuatorSignals = scale_down(thrustFraction + momentFraction, thrustFraction - momentFraction)
+        return self.thrustAndMomentFromSignals()

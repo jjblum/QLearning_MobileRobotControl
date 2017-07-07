@@ -4,11 +4,12 @@ import copy
 import Strategies
 import Designs
 import QFunctionApprox
+import RewardFunctions
 
 __author__ = 'jjb'
 
 # the model representation of the value function, shared by both the example PID boat and the Q learning boat
-_Q_ = QFunctionApprox.QFunctionApproximator()
+_Q_ = QFunctionApprox.QFunctionApproximator(state_space_dims=10, action_space_dims=2)
 
 
 def wrapToPi(angle):
@@ -61,7 +62,8 @@ class Boat(object):
         self._t = t  # current time [s]
         self._name = name
         self._state = np.zeros((6,))
-        self._idealState = np.zeros((6,))  # a "rabbit" boat to chase
+        self._sourceLocation = np.zeros((2,))  # where the boat started from
+        self._destinationLocation = np.zeros((2,))  # where the boat is going (typically the next waypoint)
         # state: [x y u w th thdot]
         self._thrustSurge = 0.0  # surge thrust [N]
         self._thrustSway = 0.0  # sway thrust (zero for tank drive) [N]
@@ -69,13 +71,14 @@ class Boat(object):
         self._thrustFraction = 0.0
         self._momentFraction = 0.0
         self._strategy = Strategies.DoNothing(self)
-        self._design = Designs.TankDriveDesign()
+        self._design = Designs.TankDriveDesign()  # by default
         self._plotData = None  # [x, y] data used to display current actions
         self._controlHz = 5  # the number of times per second the boat is allowed to change its signal, check if strategy is finished, and create Q experiences
         self._lastControlTime = 0
         self._Q = _Q_
-        self._Qstate = np.zeros((10,))  # [u w alpha delta phi alphadot deltadot phidot m0_signal m1_signal]
-        self._QlastState = np.zeros((10,))  # the starting state
+        self._Qstate = np.zeros((8,))  # [u w alpha delta phi alphadot deltadot phidot]
+        self._QlastState = np.zeros((8,))  # the state "s" in the experience (s, a, r, s')
+        self._QlastAction = np.zeros((2,))  # the action "a" in the experience (s, a, r, s'), [m0_signal m1_signal]
         # alpha = progress along line between origin and waypoint, normalized by the length of the line
         # delta = distance to the line (projection of boat onto the line)
         # phi = angle of the line with respect to the surge direction in the body frame
@@ -107,6 +110,22 @@ class Boat(object):
     @state.setter
     def state(self, state_in):
         self._state = state_in
+
+    @property
+    def sourceLocation(self):
+        return self._sourceLocation
+
+    @sourceLocation.setter
+    def sourceLocation(self, sourceLocation_in):
+        self._sourceLocation = sourceLocation_in
+
+    @property
+    def destinationLocation(self):
+        return self._destinationLocation
+
+    @destinationLocation.setter
+    def destinationLocation(self, destinationLocation_in):
+        self._destinationLocation = destinationLocation_in
 
     @property
     def thrustSurge(self):
@@ -206,17 +225,29 @@ class Boat(object):
             self._thrustFraction, self._momentFraction = self.strategy.actuationEffortFractions()
             self._lastControlTime = self.time
 
-
-            # TODO: create an exponential delay so that changing signals does not immediately create changes in thrust and moment
+            # TODO: create an exponential delay so that changing signals does create instant changes in thrust and moment
             self.thrustSurge, self.thrustSway, self.moment = \
                 self.design.thrustAndMomentFromFractions(self._thrustFraction, self._momentFraction)
 
+    def calculateQState(self):
+        # [u w alpha delta phi alphadot deltadot phidot]
+        u = self._state[2]
+        w = self._state[3]
+        phidot = self._state[5]
+        self._Qstate = np.array([u, w,                 phidot])
+        return
+
     def createExperience(self):
         # take previous state (s), previous action (a), current reward (r), and current state (s')
-        previous_state = self._QlastState
-        previous_action = []
+        previous_state = self._QlastState  # s
+        previous_action = self._QlastAction  # a
+        reward = self._Q.reward(RewardFunctions.reward_reachGoalSparse, (previous_state, previous_action, self.destinationLocation, 1.0, 1.0, np.inf))
 
-        # calculate new Q state
-        self._QExperienceQueue.append(tuple())
+        # calculate new Q state, s'
+        self.calculateQState()
+        current_state = self._Qstate
+
+        self._QExperienceQueue.append((previous_state, previous_action, reward, current_state))
+        self._QlastState = self._Qstate
 
 

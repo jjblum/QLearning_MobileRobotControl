@@ -75,11 +75,12 @@ EXPERIENCES = {"pid": list(),
 WAYPOINT_QUEUE = list()
 
 TOTAL_ITERATIONS = 0
+TOTAL_BATCHES = 0
 
 
 def iterate(event):  # event is unused
     global FIRST_TIME, LAST_TIME, BOATS, CANVAS, TIME_DILATION, LAST_COMPLETED_WP_TIME, FAILED_WAYPOINT_TIMEOUT, WAYPOINTS_INDEX, CONTROLLERS, WAYPOINT_QUEUE
-    global TEXT_BOXES, EXPERIENCES, TOTAL_ITERATIONS, NAVIGATION_LINES
+    global TEXT_BOXES, EXPERIENCES, TOTAL_ITERATIONS, NAVIGATION_LINES, TOTAL_BATCHES
     if TOTAL_ITERATIONS < 1:
         FIRST_TIME = ptime.time()  # there is a huge gap in time as the window opens, so we need this manual time reset for the very first iteration
     TOTAL_ITERATIONS += 1
@@ -111,7 +112,10 @@ def iterate(event):  # event is unused
                 TEXT_BOXES["waypoint_text"][k].text = "[{:.0f}, {:.0f}]".format(px, py)
                 TEXT_BOXES["waypoint_count"][k].text = "#{} of {}".format(WAYPOINTS_INDEX[k]+1, WAYPOINTS_BEFORE_RESET)
                 boat.strategy = Strategies.DestinationOnly(boat, waypoint, controller_name=CONTROLLERS[k])
+                boat.sourceLocation = boat.state[0:2]
+                boat.destinationLocation = waypoint
     if not WAYPOINTS_INDEX["pid"] < WAYPOINTS_BEFORE_RESET or not WAYPOINTS_INDEX["q"] < WAYPOINTS_BEFORE_RESET:
+        TOTAL_BATCHES += 1
         reset_boats()
     else:
         LAST_TIME = current_time
@@ -162,6 +166,7 @@ def reset_boats():
         TEXT_BOXES["waypoint_text"][k].text = "[{:.0f}, {:.0f}]".format(px, py)
         TEXT_BOXES["waypoint_count"][k].text = "#{} of {}".format(WAYPOINTS_INDEX[k] + 1, WAYPOINTS_BEFORE_RESET)
         boat.strategy = Strategies.DestinationOnly(boat, waypoint, controller_name=CONTROLLERS[k])
+        boat.calculateQState()  # need to initialize the state for Q learning
 
 
 def setup():
