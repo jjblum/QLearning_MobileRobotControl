@@ -107,7 +107,8 @@ class TankDriveDesign(Lutra):
         m0 = self._actuator_signals[0]
         m1 = self._actuator_signals[1]
         if m0 > 0:
-            t0 = 0.75*self._maxForwardThrustPerMotor*m0  # imbalanced, as if the prop has chipped
+            #t0 = 0.75*self._maxForwardThrustPerMotor*m0  # imbalanced, as if the prop has chipped
+            t0 = self._maxForwardThrustPerMotor * m0
         else:
             t0 = self._maxBackwardThrustPerMotor*m0
 

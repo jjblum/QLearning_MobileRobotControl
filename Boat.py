@@ -241,12 +241,17 @@ class Boat(object):
         source_to_dest = self._destinationLocation - self._sourceLocation
         source_to_boat = self._state[0:2] - self._sourceLocation
         boat_to_dest = self._destinationLocation - self._state[0:2]
-        L = np.linalg.norm(source_to_dest)
-        theta = np.arctan2(source_to_dest[1], source_to_dest[0])
-        phi = wrapToPi(theta - self._state[4])
-        alpha = np.linalg.norm(source_to_boat)*np.cos(phi) / L
-        delta = L*alpha*np.sin(phi)
-        return L, theta, phi, alpha, delta
+        source_to_boat_angle = np.arctan2(source_to_boat[1], source_to_boat[0])
+        source_to_dest_angle = np.arctan2(source_to_dest[1], source_to_dest[0])
+        dth = np.abs(source_to_dest_angle - source_to_boat_angle)  # need to use difference in angles of lines from source to dest and source to boat
+        source_to_dest_length = np.linalg.norm(source_to_dest)
+        source_to_boat_length = np.linalg.norm(source_to_boat)
+        phi = wrapToPi(source_to_dest_angle - self._state[4])
+        alpha = source_to_boat_length*np.cos(dth) / source_to_dest_length
+        delta = source_to_dest_length*alpha*np.sin(dth)
+        #if self._name == "pid boat":
+        #    print source_to_dest_length, source_to_dest_angle, phi, alpha, delta
+        return source_to_dest_length, source_to_dest_angle, phi, alpha, delta
 
     def distanceFromDestination(self):
         return np.linalg.norm(self._destinationLocation - self._state[0:2])
@@ -260,13 +265,14 @@ class Boat(object):
         return parallel/L, perpendicular
 
     def calculateQState(self):
-        # [u w alpha delta phi alphadot deltadot phidot]
+        # [u w alpha delta phi alphadot deltadot phidot]  TODO: I don't think alpha and alphadot are a good idea. The length of the line is too variable.
+        # [u w alpha*L delta phi alphadot*L deltadot phidot]  # multiply L back in
         L, theta, phi, alpha, delta = self.sourceToDestinationLine()
         u = self._state[2]
         w = self._state[3]
         alphadot, deltadot = self.projectVelocityOntoSourceDestLine(L, phi)
         phidot = self._state[5]
-        self._Qstate = np.array([u, w, alpha, delta, phi, alphadot, deltadot, phidot])
+        self._Qstate = np.array([u, w, (1-alpha)*L, delta, phi, alphadot*L, deltadot, phidot])
         return
 
     def createExperience(self):
@@ -279,7 +285,15 @@ class Boat(object):
         current_state = self._Qstate
         reward = self._Q.reward(RewardFunctions.reward_reachGoalSparse, (self.distanceFromDestination(), self._state[2], 1.0, 1.0, np.inf))
 
-        self._QExperienceQueue.append((previous_state, previous_action, reward, current_state))
+        experience = (previous_state, previous_action, reward, current_state)
+        """
+        if self._name == "pid boat" and reward > 0:
+            print self._destinationLocation
+            print self._state
+            print self.distanceFromDestination()
+            print current_state
+        """
+        self._QExperienceQueue.append(experience)
         self._QlastState = self._Qstate
 
 

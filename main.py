@@ -12,7 +12,7 @@ from vispy.util import ptime
 #                   USER SETTINGS  ###################
 ######################################################
 ######################################################
-TIME_DILATION = 10.0  # the number of seconds that pass in the program for every real-time second
+TIME_DILATION = 20.0  # the number of seconds that pass in the program for every real-time second
 FAILED_WAYPOINT_TIMEOUT = 30.0  # number of seconds before abandoning a waypoint
 WAYPOINTS_BEFORE_RESET = 10  # the number of waypoints attempted before the boats reset to the center. A "batch"
 ######################################################
