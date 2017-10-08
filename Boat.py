@@ -9,7 +9,7 @@ import RewardFunctions
 __author__ = 'jjb'
 
 # the model representation of the value function, shared by both the example PID boat and the Q learning boat
-_Q_ = QFunctionApprox.QFunctionApproximator(state_space_dims=10, action_space_dims=2)
+_Q_ = QFunctionApprox.QFunctionApproximator(state_space_dims=8, action_space_dims=2)
 
 
 def wrapToPi(angle):
@@ -58,7 +58,7 @@ def ode(state, t, boat):
 
 class Boat(object):
 
-    def __init__(self, t=0.0, name="boat"):
+    def __init__(self, t=0.0, name="boat", design=Designs.TankDriveDesign()):
         self._t = t  # current time [s]
         self._name = name
         self._state = np.zeros((6,))
@@ -71,7 +71,7 @@ class Boat(object):
         self._thrustFraction = 0.0
         self._momentFraction = 0.0
         self._strategy = Strategies.DoNothing(self)
-        self._design = Designs.TankDriveDesign()  # by default
+        self._design = design
         self._plotData = None  # [x, y] data used to display current actions
         self._controlHz = 5  # the number of times per second the boat is allowed to change its signal, check if strategy is finished, and create Q experiences
         self._lastControlTime = 0
@@ -271,7 +271,7 @@ class Boat(object):
         u = self._state[2]
         w = self._state[3]
         alphadot, deltadot = self.projectVelocityOntoSourceDestLine(L, phi)
-        phidot = self._state[5]
+        phidot = self._state[5]  # boat's heading rate of change is the same as phidot
         self._Qstate = np.array([u, w, (1-alpha)*L, delta, phi, alphadot*L, deltadot, phidot])
         return
 

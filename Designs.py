@@ -80,6 +80,32 @@ class Lutra(Design):
         self._dragCoeffs = [0.258717640651218, 1.088145891415693, 2.0]  # surge, sway, rotation [-]
 
 
+class AirboatDesign(Lutra):
+    def __init__(self):
+        super(AirboatDesign, self).__init__()
+        self._maxForwardThrust = 20.0  # [N]
+        self._maxBackwardThrust = 7.0  # [N]
+        self._momentArm = 0.5 # [m]
+
+    def thrustAndMomentFromSignals(self):
+        m0 = self._actuator_signals[0]
+        s0 = -self._actuator_signals[1]
+        if np.abs(m0) > 1:
+            m0 = 1.*np.sign(m0)
+        if m0 > 0:
+            thrust = m0*self._maxForwardThrust
+        else:
+            thrust = m0*self._maxBackwardThrust
+        if np.abs(s0) > 1:
+            s0 = 1.*np.sign(s0)
+        angle = s0*75.*np.pi/180.
+        return thrust*np.cos(angle), thrust*np.sin(angle), thrust*np.sin(angle)*self._momentArm
+
+    def thrustAndMomentFromFractions(self, thrustFraction, momentFraction):
+        self._actuator_signals = thrustFraction, momentFraction
+        return self.thrustAndMomentFromSignals()
+
+
 class TankDriveDesign(Lutra):
     def __init__(self):
         super(TankDriveDesign, self).__init__()
@@ -87,28 +113,13 @@ class TankDriveDesign(Lutra):
         self._maxBackwardThrustPerMotor = 10.0  # back-driving motors is much weaker, or a propguard lowers this thrust
         self._momentArm = 0.3556  # distance between the motors [m]
         # below 1 m/s, you should probably just turn in place!
-        self._thCoeff = 2.54832785865
-        self._rCoeff = 0.401354269952
-        self._u0Coeff = 0.0914788305811
-
-    @property
-    def thCoeff(self):
-        return self._thCoeff
-
-    @property
-    def rCoeff(self):
-        return self._rCoeff
-
-    @property
-    def u0Coeff(self):
-        return self._u0Coeff
 
     def thrustAndMomentFromSignals(self):
         m0 = self._actuator_signals[0]
         m1 = self._actuator_signals[1]
         if m0 > 0:
             #t0 = 0.75*self._maxForwardThrustPerMotor*m0  # imbalanced, as if the prop has chipped
-            t0 = self._maxForwardThrustPerMotor * m0
+            t0 = self._maxForwardThrustPerMotor*m0
         else:
             t0 = self._maxBackwardThrustPerMotor*m0
 

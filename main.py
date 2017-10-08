@@ -146,8 +146,8 @@ def generate_random_waypoints_queue():
 
 def reset_boats():
     global BOATS, CONTROLLERS, WAYPOINT_QUEUE, WAYPOINTS_INDEX, WAYPOINTS_BEFORE_RESET, LAST_COMPLETED_WP_TIME, LAST_TIME, FIRST_TIME, TEXT_BOXES
-    BOATS = {"pid": Boat.Boat(),
-             "q": Boat.Boat()}
+    BOATS = {"pid": Boat.Boat(design=Designs.AirboatDesign()),
+             "q": Boat.Boat(design=Designs.AirboatDesign())}
     # generate all the random waypoints
     generate_random_waypoints_queue()
     waypoint = WAYPOINT_QUEUE[0]
@@ -170,23 +170,26 @@ def reset_boats():
         boat.destinationLocation = waypoint
         boat.calculateQState()  # need to initialize the state for Q learning
 
-
+"""
 def setup():
     global BOATS
     pid_boat = BOATS["pid"]
-    pid_boat.design = Designs.TankDriveDesign()
+    #pid_boat.design = Designs.TankDriveDesign()
+    pid_boat.design = Designs.AirboatDesign()
     pid_boat.time = 0
     pid_boat.name = "pid boat"
 
     q_boat = BOATS["q"]
-    q_boat.design = Designs.TankDriveDesign()
+    #q_boat.design = Designs.TankDriveDesign()
+    q_boat.design = Designs.AirboatDesign()
     q_boat.time = 0
     q_boat.name = "q boat"
 
     reset_boats()
-
+"""
 
 if __name__ == "__main__":
-    setup()
+    #setup()
+    reset_boats()
     CANVAS.update()
     app.run()

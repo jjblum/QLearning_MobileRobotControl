@@ -157,7 +157,7 @@ class PointAndShootPID(Controller):
         self.time = self.boat.time
 
         clippedAngleError = np.clip(math.fabs(error_th), 0.0, self._headingErrorSurgeCutoff)
-        thrustReductionRatio = math.cos(math.pi/2.0*clippedAngleError/self._headingErrorSurgeCutoff)
+        thrustReductionRatio = 1 #math.cos(math.pi/2.0*clippedAngleError/self._headingErrorSurgeCutoff)
         momentFraction = np.clip(error_th_signal, -1.0, 1.0)
         thrustFraction = np.clip(error_pos_signal, -1.0, 1.0)
         thrustFraction *= thrustReductionRatio
