@@ -68,12 +68,16 @@ class Boat(object):
         self._thrustSurge = 0.0  # surge thrust [N]
         self._thrustSway = 0.0  # sway thrust (zero for tank drive) [N]
         self._moment = 0.0  # [Nm]
+        self._thrustSurgeOLD = 0.0  # used for exponential curve toward new value
+        self._thrustSwayOLD = 0.0  # used for exponential curve toward new value
+        self._momentOLD = 0.0  # used for exponential curve toward new value
+        self._decayConstant = 0.15  # used for exponential curve toward new value, lower means slower
         self._thrustFraction = 0.0
         self._momentFraction = 0.0
         self._strategy = Strategies.DoNothing(self)
         self._design = design
         self._plotData = None  # [x, y] data used to display current actions
-        self._controlHz = 5  # the number of times per second the boat is allowed to change its signal, check if strategy is finished, and create Q experiences
+        self._controlHz = 10  # the number of times per second the boat is allowed to change its signal, check if strategy is finished, and create Q experiences
         self._lastControlTime = 0
         self._Q = _Q_
         self._Qstate = np.zeros((8,))  # [u w alpha delta phi alphadot deltadot phidot]
@@ -226,9 +230,18 @@ class Boat(object):
             self._thrustFraction, self._momentFraction = self.strategy.actuationEffortFractions()
             self._lastControlTime = self.time
 
+            self._thrustSurgeOLD = self._thrustSurge
+            self._thrustSwayOLD = self._thrustSway
+            self._momentOLD = self._moment
+
             # TODO: create an exponential delay so that changing signals does create instant changes in thrust and moment
-            self.thrustSurge, self.thrustSway, self.moment = \
+            ideal_thrustSurge, ideal_thrustSway, ideal_moment = \
                 self.design.thrustAndMomentFromFractions(self._thrustFraction, self._momentFraction)
+            self.thrustSurge = ideal_thrustSurge*self._decayConstant + self._thrustSurgeOLD*(1 - self._decayConstant)
+            self.thrustSway = ideal_thrustSway * self._decayConstant + self._thrustSwayOLD * (1 - self._decayConstant)
+            self.moment = ideal_moment * self._decayConstant + self._momentOLD * (1 - self._decayConstant)
+
+
 
     def sourceToDestinationLine(self):
         """

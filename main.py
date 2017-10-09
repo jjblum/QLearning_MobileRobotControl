@@ -12,7 +12,7 @@ from vispy.util import ptime
 #                   USER SETTINGS  ###################
 ######################################################
 ######################################################
-TIME_DILATION = 20.0  # the number of seconds that pass in the program for every real-time second
+TIME_DILATION = 3.0  # the number of seconds that pass in the program for every real-time second
 FAILED_WAYPOINT_TIMEOUT = 30.0  # number of seconds before abandoning a waypoint
 WAYPOINTS_BEFORE_RESET = 10  # the number of waypoints attempted before the boats reset to the center. A "batch"
 ######################################################
@@ -111,7 +111,8 @@ def iterate(event):  # event is unused
                 TEXT_BOXES["waypoint_symbol"][k].pos = (px, py+15)  # py-0.5*fontsize to center the text vertically
                 TEXT_BOXES["waypoint_text"][k].text = "[{:.0f}, {:.0f}]".format(px, py)
                 TEXT_BOXES["waypoint_count"][k].text = "#{} of {}".format(WAYPOINTS_INDEX[k]+1, WAYPOINTS_BEFORE_RESET)
-                boat.strategy = Strategies.DestinationOnly(boat, waypoint, controller_name=CONTROLLERS[k])
+                #boat.strategy = Strategies.DestinationOnly(boat, waypoint, controller_name=CONTROLLERS[k])
+                boat.strategy = Strategies.LineFollower(boat, waypoint, controller_name=CONTROLLERS[k])
                 boat.sourceLocation = boat.state[0:2]
                 boat.destinationLocation = waypoint
     if not WAYPOINTS_INDEX["pid"] < WAYPOINTS_BEFORE_RESET or not WAYPOINTS_INDEX["q"] < WAYPOINTS_BEFORE_RESET:
@@ -165,7 +166,8 @@ def reset_boats():
         TEXT_BOXES["waypoint_symbol"][k].pos = (px, py)
         TEXT_BOXES["waypoint_text"][k].text = "[{:.0f}, {:.0f}]".format(px, py)
         TEXT_BOXES["waypoint_count"][k].text = "#{} of {}".format(WAYPOINTS_INDEX[k] + 1, WAYPOINTS_BEFORE_RESET)
-        boat.strategy = Strategies.DestinationOnly(boat, waypoint, controller_name=CONTROLLERS[k])
+        #boat.strategy = Strategies.DestinationOnly(boat, waypoint, controller_name=CONTROLLERS[k])
+        boat.strategy = Strategies.LineFollower(boat, waypoint, controller_name=CONTROLLERS[k])
         boat.sourceLocation = boat.state[0:2]
         boat.destinationLocation = waypoint
         boat.calculateQState()  # need to initialize the state for Q learning

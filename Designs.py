@@ -75,9 +75,10 @@ class Lutra(Design):
         self._mass = 5.7833  # [kg]
         self._momentOfInertia = 0.6  # [kg/m^2]
         self._dragAreas = [0.0108589939, 0.0424551192, 0.0424551192]  # surge, sway, rotation [m^2]
-        #  self._dragCoeffs = [0.258717640651218, 1.088145891415693, 0.048292066650533]  # surge, sway, rotation [-]
+        # self._dragCoeffs = [0.258717640651218, 1.088145891415693, 0.048292066650533]  # surge, sway, rotation [-]
+        self._dragCoeffs = [0.258717640651218, 1.088145891415693, 0.1]  # surge, sway, rotation [-]
         #  self._dragCoeffs = [1.5, 1.088145891415693, 2.0]  # surge, sway, rotation [-]
-        self._dragCoeffs = [0.258717640651218, 1.088145891415693, 2.0]  # surge, sway, rotation [-]
+        #self._dragCoeffs = [0.258717640651218, 1.088145891415693, 2.0]  # surge, sway, rotation [-]
 
 
 class AirboatDesign(Lutra):

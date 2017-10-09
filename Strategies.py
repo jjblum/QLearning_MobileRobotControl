@@ -160,7 +160,7 @@ class DestinationOnly(Strategy):
         self._destinationState = destination
         if controller_name == "PointAndShoot":
             THRUST_PID = [0.5, 0, 0]  #[0.5, 0.01, 10.00]  # P, I, D
-            HEADING_PID = [1.0, 0, 0]  #[1.0, 0.0, 1.0]  # P, I, D
+            HEADING_PID = [0.7, 0, 0.9]  #[1.0, 0.0, 1.0]  # P, I, D
             HEADING_ERROR_SURGE_CUTOFF_ANGLE = 180.0  # [degrees of heading error at which thrust is forced to be zero, follows a half-cosine shape]
             self.controller = Controllers.PointAndShootPID(boat, THRUST_PID, HEADING_PID, HEADING_ERROR_SURGE_CUTOFF_ANGLE, positionThreshold)
         elif controller_name == "QLearnPointAndShoot":
@@ -191,3 +191,51 @@ class DestinationOnly(Strategy):
     def idealState(self):
         # self.boat.plotData = np.atleast_2d(np.array([[self.boat.state[0], self.boat.state[1]], [self._destinationState[0], self._destinationState[1]]]))
         self.controller.idealState = self.destinationState  # update this here so the controller doesn't need to import Strategies
+
+
+class LineFollower(Strategy):
+    def __init__(self, boat, destination, positionThreshold=1.0, controller_name="PointAndShoot"):
+        super(LineFollower, self).__init__(boat)
+        self._x0 = boat.state[0]
+        self._x1 = destination[0]
+        self._y0 = boat.state[1]
+        self._y1 = destination[1]
+        self._dx = self._x1-self._x0
+        self._dy = self._y1-self._y0
+        self._th = np.arctan2(self._dy, self._dx)
+        self._L = np.sqrt(np.power(self._dx, 2.)+np.power(self._dy, 2.))
+        self._destination = destination
+        self._lookAhead = 5.0
+        self._positionThreshold = positionThreshold
+        if controller_name == "PointAndShoot":
+            THRUST_PID = [0.5, 0, 0]  #[0.5, 0.01, 10.00]  # P, I, D
+            HEADING_PID = [0.7, 0, 0.5]  #[1.0, 0.0, 1.0]  # P, I, D
+            HEADING_ERROR_SURGE_CUTOFF_ANGLE = 180.0  # [degrees of heading error at which thrust is forced to be zero, follows a half-cosine shape]
+            self.controller = Controllers.PointAndShootPID(boat, THRUST_PID, HEADING_PID, HEADING_ERROR_SURGE_CUTOFF_ANGLE, positionThreshold)
+        elif controller_name == "QLearnPointAndShoot":
+            self.controller = Controllers.QLearnPointAndShoot(boat)
+
+    def idealState(self):
+        state = np.zeros((6,))
+        # project point onto line
+        x = self.boat.state[0]
+        dx = x - self._x0
+        y = self.boat.state[1]
+        dy = y - self._y0
+        th = np.arctan2(dy, dx)
+        dth = np.abs(self._th - th)
+        currentL = np.linalg.norm(np.array([dx, dy]))*np.cos(dth)
+        distance = np.linalg.norm(np.array([dx, dy]))*np.sin(dth)
+        # self._lookAhead = 5.*(1.-np.tanh(0.1*distance))
+        # print "distance = {:.2f} m   lookAhead = {:.2f} m".format(distance, self._lookAhead)
+        projected_state = np.array([self._x0 + currentL*np.cos(self._th), self._y0 + currentL*np.sin(self._th)])
+        if (currentL + self._lookAhead) > self._L:
+            lookaheadState = np.array([self._x1, self._y1])
+        else:
+            lookaheadState = projected_state + np.array([self._lookAhead*np.cos(self._th), self._lookAhead*np.sin(self._th)])
+        state[0] = lookaheadState[0]
+        state[1] = lookaheadState[1]
+        boatToLookahead = np.array([lookaheadState[0] - x, lookaheadState[1] - y])
+        boatToLookaheadAngle = np.arctan2(boatToLookahead[1], boatToLookahead[0])
+        state[4] = boatToLookaheadAngle
+        self.controller.idealState = state
