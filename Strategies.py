@@ -160,7 +160,7 @@ class DestinationOnly(Strategy):
         self._destinationState = destination
         if controller_name == "PointAndShoot":
             THRUST_PID = [0.5, 0, 0]  #[0.5, 0.01, 10.00]  # P, I, D
-            HEADING_PID = [0.7, 0, 0.9]  #[1.0, 0.0, 1.0]  # P, I, D
+            HEADING_PID = [0.7, 0, 0]  #[1.0, 0.0, 1.0]  # P, I, D
             HEADING_ERROR_SURGE_CUTOFF_ANGLE = 180.0  # [degrees of heading error at which thrust is forced to be zero, follows a half-cosine shape]
             self.controller = Controllers.PointAndShootPID(boat, THRUST_PID, HEADING_PID, HEADING_ERROR_SURGE_CUTOFF_ANGLE, positionThreshold)
         elif controller_name == "QLearnPointAndShoot":
@@ -208,8 +208,8 @@ class LineFollower(Strategy):
         self._lookAhead = 5.0
         self._positionThreshold = positionThreshold
         if controller_name == "PointAndShoot":
-            THRUST_PID = [0.5, 0, 0]  #[0.5, 0.01, 10.00]  # P, I, D
-            HEADING_PID = [0.7, 0, 0.5]  #[1.0, 0.0, 1.0]  # P, I, D
+            THRUST_PID = [0.15, 0, 0]  #[0.5, 0.01, 10.00]  # P, I, D
+            HEADING_PID = [0.1, 0, 0]  #[1.0, 0.0, 1.0]  # P, I, D
             HEADING_ERROR_SURGE_CUTOFF_ANGLE = 180.0  # [degrees of heading error at which thrust is forced to be zero, follows a half-cosine shape]
             self.controller = Controllers.PointAndShootPID(boat, THRUST_PID, HEADING_PID, HEADING_ERROR_SURGE_CUTOFF_ANGLE, positionThreshold)
         elif controller_name == "QLearnPointAndShoot":
@@ -225,9 +225,9 @@ class LineFollower(Strategy):
         th = np.arctan2(dy, dx)
         dth = np.abs(self._th - th)
         currentL = np.linalg.norm(np.array([dx, dy]))*np.cos(dth)
-        distance = np.linalg.norm(np.array([dx, dy]))*np.sin(dth)
-        # self._lookAhead = 5.*(1.-np.tanh(0.1*distance))
-        # print "distance = {:.2f} m   lookAhead = {:.2f} m".format(distance, self._lookAhead)
+        distance = np.abs(np.linalg.norm(np.array([dx, dy]))*np.sin(dth))
+        self._lookAhead = 20.*(1.-np.tanh(0.3*distance))
+        #print "distance = {:.2f} m   lookAhead = {:.2f} m".format(distance, self._lookAhead)
         projected_state = np.array([self._x0 + currentL*np.cos(self._th), self._y0 + currentL*np.sin(self._th)])
         if (currentL + self._lookAhead) > self._L:
             lookaheadState = np.array([self._x1, self._y1])
@@ -239,3 +239,63 @@ class LineFollower(Strategy):
         boatToLookaheadAngle = np.arctan2(boatToLookahead[1], boatToLookahead[0])
         state[4] = boatToLookaheadAngle
         self.controller.idealState = state
+
+
+class PseudoRandomBalancedHeading(Strategy):
+    def __init__(self, boat, fixed_thrust=0.2, angle_divisions=8):
+        super(PseudoRandomBalancedHeading, self).__init__(boat)
+        self.boat = boat
+        self.th = 0
+        self.angle_bins = np.linspace(-np.pi, np.pi, angle_divisions, endpoint=False)
+        self.angle_bin_counts = np.zeros(self.angle_bins.shape)
+        self.angle_bin_selection_counts = np.zeros(self.angle_bins.shape)
+        self.angle_start_time = 0
+        self.angle_duration = 0
+        self.elapsed_time = 0
+        self.controller = Controllers.MaintainHeading(boat, [0.5, 0, 0.5], fixed_thrust)
+
+    def idealState(self):
+        state = np.zeros((6,))
+        self.elapsed_time = self.boat.time - self.angle_start_time
+        if self.elapsed_time >= self.angle_duration:
+            self.randomAngle()
+        state[4] = self.th
+        self.controller.idealState = state
+
+    def randomAngle(self):
+        # TODO: randomly select an ideal heading using the angle bin counts
+        # add counts to the previous angle (self.th) and those around it, scaling by cos(self.th - bin angle)
+        # The maximum added count is the elapsed time
+        self.angle_bin_counts -= np.min(self.angle_bin_counts)  # subtract out equal time
+        old_angle = self.th
+        counts = np.round(self.elapsed_time*np.cos(self.angle_bins - self.th), 3)
+        counts[counts < 0] = 0
+        self.angle_bin_counts += counts*1000
+        #self.angle_bin_counts = self.angle_bin_selection_counts  # use the number of times that angle is used rather than time spent
+        counts_sum = np.sum(self.angle_bin_counts)
+        if counts_sum == 0:
+            normalized_counts = 1./self.angle_bins.shape[0]*np.ones(self.angle_bins.shape)
+        else:
+            normalized_counts = 1./(self.angle_bins.shape[0] - 1)*(1 - self.angle_bin_counts/counts_sum)
+            print "max bin ratio = {}".format(np.max(normalized_counts)/np.min(normalized_counts))
+        random_selector = np.random.rand()
+        # random_selector is a pointer within [0, 1], points to somewhere within the cumulative sum of normalized counts
+        cumsum = np.cumsum(normalized_counts)
+        bin_to_use = np.min(np.where(cumsum > random_selector))
+        print "****************"
+        self.angle_bin_selection_counts[bin_to_use] += 1
+        print self.angle_bins*180./np.pi
+        print self.angle_bin_selection_counts
+        print np.round(self.angle_bin_counts, 3)
+        print "****************"
+        self.th = self.angle_bins[bin_to_use]
+
+        """
+        if counts_sum > self.angle_bins.shape[0]*10.0: #and np.max(self.angle_bin_counts)/np.min(self.angle_bin_counts) < 2:
+            print "counts are similar and average of 10 seconds per bin has elapsed. Resetting bins"
+            self.angle_bin_counts = np.zeros(self.angle_bins.shape[0])
+        """
+
+        self.angle_start_time = self.boat.time
+        self.angle_duration = np.abs(180*(old_angle-self.th)/np.pi)/20. + 5.0 #10.*normalized_counts[bin_to_use]/np.max(self.angle_bin_counts)  # include extra time to turn
+        return

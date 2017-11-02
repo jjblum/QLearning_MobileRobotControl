@@ -33,13 +33,14 @@ class UniversalPID(object):
             #if self._name == "heading_PID":
             #    self._errorDerivative -= self._boat.state[5]  # in the phone app, they use rudder_pids[2]*(angle_destination_change - drz) where drz is the gyro
         self._errorAccumulation += dt*error
-        # if self._name == "heading_PID":
-        #    print "{}: e = {}, P term = {}, I term = {}, D term = {}".format(self._name, error, self._P*error, self._I*self._errorAccumulation, self._D*self._errorDerivative)
+        #9if self._name == "heading_PID":
+            #print "{}: e = {}, de/dt = {}, P term = {}, I term = {}, D term = {}".format(self._name, error, self._errorDerivative, self._P*error, self._I*self._errorAccumulation, self._D*self._errorDerivative)
         #return self._P*error + self._I*self._errorAccumulation + self._D*self._errorDerivative
         self._errorOld = error
         lookahead_steps = 0#np.max([1, np.min([5, np.floor_divide(np.abs(error), 10.*np.pi/180.)])])  # between 1 and 5
         if self._name == "heading_PID":
-            print "Error = {:.0f}, de/dt = {:.0f}, {:.0f}-step-error = {:.0f}".format(error*180./np.pi, self._errorDerivative*180./np.pi, lookahead_steps, (error + self._errorDerivative*lookahead_steps*dt)*180./np.pi)
+            # print "Error = {:.0f}, de/dt = {:.0f}, {:.0f}-step-error = {:.0f}".format(error*180./np.pi, self._errorDerivative*180./np.pi, lookahead_steps, (error + self._errorDerivative*lookahead_steps*dt)*180./np.pi)
+            pass
         return self._P*(error + self._errorDerivative*lookahead_steps*dt) + self._D*self._errorDerivative  # use the error one step in the future, i.e. one-step-ahead-error = error + de/dt*dt
 
 
@@ -115,6 +116,25 @@ class DoNothing(Controller):
 
     def actuationEffortFractions(self):
         return 0.0, 0.0
+
+
+class MaintainHeading(Controller):
+    def __init__(self, boat, heading_PID, thrust=0.5):
+        super(MaintainHeading, self).__init__()
+        self.boat = boat
+        self.time = boat.time
+        self.thrust = thrust
+        self._headingPID = UniversalPID(boat, heading_PID[0], heading_PID[1], heading_PID[2], boat.time, "heading_PID")
+
+    def actuationEffortFractions(self):
+        state = self.boat.state
+        error_th = wrapToPi(self.idealState[4] - state[4])
+        error_th_signal = self._headingPID.signal(error_th, self.boat.time)
+        error_pos_signal = self.thrust
+        self.time = self.boat.time
+        momentFraction = np.clip(error_th_signal, -1.0, 1.0)
+        thrustFraction = np.clip(error_pos_signal, -1.0, 1.0)
+        return thrustFraction, momentFraction
 
 
 class PointAndShootPID(Controller):

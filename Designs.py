@@ -73,10 +73,10 @@ class Lutra(Design):
     def __init__(self):
         super(Lutra, self).__init__()
         self._mass = 5.7833  # [kg]
-        self._momentOfInertia = 0.6  # [kg/m^2]
+        self._momentOfInertia = 0.7  # [kg/m^2]
         self._dragAreas = [0.0108589939, 0.0424551192, 0.0424551192]  # surge, sway, rotation [m^2]
         # self._dragCoeffs = [0.258717640651218, 1.088145891415693, 0.048292066650533]  # surge, sway, rotation [-]
-        self._dragCoeffs = [0.258717640651218, 1.088145891415693, 0.1]  # surge, sway, rotation [-]
+        self._dragCoeffs = [0.258717640651218, 1.088145891415693, 0.2]  # surge, sway, rotation [-]
         #  self._dragCoeffs = [1.5, 1.088145891415693, 2.0]  # surge, sway, rotation [-]
         #self._dragCoeffs = [0.258717640651218, 1.088145891415693, 2.0]  # surge, sway, rotation [-]
 
@@ -100,6 +100,7 @@ class AirboatDesign(Lutra):
         if np.abs(s0) > 1:
             s0 = 1.*np.sign(s0)
         angle = s0*75.*np.pi/180.
+        #print "Airfan signal = {:f},  angle = {:f} deg".format(s0, angle*180./np.pi)
         return thrust*np.cos(angle), thrust*np.sin(angle), thrust*np.sin(angle)*self._momentArm
 
     def thrustAndMomentFromFractions(self, thrustFraction, momentFraction):

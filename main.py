@@ -12,8 +12,8 @@ from vispy.util import ptime
 #                   USER SETTINGS  ###################
 ######################################################
 ######################################################
-TIME_DILATION = 3.0  # the number of seconds that pass in the program for every real-time second
-FAILED_WAYPOINT_TIMEOUT = 30.0  # number of seconds before abandoning a waypoint
+TIME_DILATION = 20.0  # the number of seconds that pass in the program for every real-time second
+FAILED_WAYPOINT_TIMEOUT = 3000.0  # number of seconds before abandoning a waypoint
 WAYPOINTS_BEFORE_RESET = 10  # the number of waypoints attempted before the boats reset to the center. A "batch"
 ######################################################
 ######################################################
@@ -98,6 +98,7 @@ def iterate(event):  # event is unused
         boat.time = current_time
         states = spi.odeint(Boat.ode, boat.state, times, (boat,))
         boat.state = states[-1]
+        boat.state[4] = Boat.wrapToPi(boat.state[4])
         px, py = xy_location_to_pixel_location(states[-1][0], states[-1][1])
         heading = Boat.wrapTo2Pi(states[-1][4])
         BOAT_VISUALS[k].new_pose(px, py, heading)
@@ -148,7 +149,7 @@ def generate_random_waypoints_queue():
 def reset_boats():
     global BOATS, CONTROLLERS, WAYPOINT_QUEUE, WAYPOINTS_INDEX, WAYPOINTS_BEFORE_RESET, LAST_COMPLETED_WP_TIME, LAST_TIME, FIRST_TIME, TEXT_BOXES
     BOATS = {"pid": Boat.Boat(design=Designs.AirboatDesign()),
-             "q": Boat.Boat(design=Designs.AirboatDesign())}
+             "q": Boat.Boat(design=Designs.TankDriveDesign())}
     # generate all the random waypoints
     generate_random_waypoints_queue()
     waypoint = WAYPOINT_QUEUE[0]
@@ -167,7 +168,12 @@ def reset_boats():
         TEXT_BOXES["waypoint_text"][k].text = "[{:.0f}, {:.0f}]".format(px, py)
         TEXT_BOXES["waypoint_count"][k].text = "#{} of {}".format(WAYPOINTS_INDEX[k] + 1, WAYPOINTS_BEFORE_RESET)
         #boat.strategy = Strategies.DestinationOnly(boat, waypoint, controller_name=CONTROLLERS[k])
-        boat.strategy = Strategies.LineFollower(boat, waypoint, controller_name=CONTROLLERS[k])
+        #boat.strategy = Strategies.LineFollower(boat, waypoint, controller_name=CONTROLLERS[k])
+        if (k == "pid"):
+            boat.strategy = Strategies.PseudoRandomBalancedHeading(boat, fixed_thrust=0.2, angle_divisions=8)
+        else:
+            boat.strategy = Strategies.DoNothing(boat)
+
         boat.sourceLocation = boat.state[0:2]
         boat.destinationLocation = waypoint
         boat.calculateQState()  # need to initialize the state for Q learning

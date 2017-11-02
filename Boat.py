@@ -71,7 +71,7 @@ class Boat(object):
         self._thrustSurgeOLD = 0.0  # used for exponential curve toward new value
         self._thrustSwayOLD = 0.0  # used for exponential curve toward new value
         self._momentOLD = 0.0  # used for exponential curve toward new value
-        self._decayConstant = 0.15  # used for exponential curve toward new value, lower means slower
+        self._decayConstant = 0.5  # used for exponential curve toward new value, lower means slower
         self._thrustFraction = 0.0
         self._momentFraction = 0.0
         self._strategy = Strategies.DoNothing(self)
@@ -234,14 +234,12 @@ class Boat(object):
             self._thrustSwayOLD = self._thrustSway
             self._momentOLD = self._moment
 
-            # TODO: create an exponential delay so that changing signals does create instant changes in thrust and moment
+            # TODO: create an exponential delay so that changing signals does not create instant changes in thrust and moment
             ideal_thrustSurge, ideal_thrustSway, ideal_moment = \
                 self.design.thrustAndMomentFromFractions(self._thrustFraction, self._momentFraction)
             self.thrustSurge = ideal_thrustSurge*self._decayConstant + self._thrustSurgeOLD*(1 - self._decayConstant)
             self.thrustSway = ideal_thrustSway * self._decayConstant + self._thrustSwayOLD * (1 - self._decayConstant)
             self.moment = ideal_moment * self._decayConstant + self._momentOLD * (1 - self._decayConstant)
-
-
 
     def sourceToDestinationLine(self):
         """
